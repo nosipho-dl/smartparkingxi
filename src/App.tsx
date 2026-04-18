@@ -8,6 +8,7 @@ import {
   ChevronRight, 
   Clock, 
   Info, 
+  Brain,
   LayoutDashboard, 
   Map as MapIcon, 
   MapPin, 
@@ -20,7 +21,8 @@ import {
   Zap 
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState, useMemo } from 'react';
+import { getParkingSuggestion, ParkingSuggestion } from './services/geminiService';
 
 // --- Types ---
 type Screen = 
@@ -204,6 +206,9 @@ export default function App() {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isBlockedUntil, setIsBlockedUntil] = useState<number | null>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<ParkingSuggestion | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [userPreference, setUserPreference] = useState("Closest and Cheapest");
 
   const navigateTo = (target: Screen) => {
     setHistory(prev => [...prev, target]);
@@ -274,7 +279,54 @@ export default function App() {
     navigateTo('home');
   };
 
+  const fetchAiSuggestion = async () => {
+    if (!selectedZone) return;
+    
+    setIsAiLoading(true);
+    setAiSuggestion(null);
+    
+    const availableBays = selectedZone.bays
+      .filter(b => b.status === 'available')
+      .map(b => ({
+        id: b.id,
+        type: rowToType(b.label.charAt(0)),
+        price: rowToPrice(b.label.charAt(0)),
+        distance: "Close" // Mocked for now
+      }));
+
+    if (availableBays.length === 0) {
+      setIsAiLoading(false);
+      return;
+    }
+
+    const suggestion = await getParkingSuggestion(selectedZone.name, availableBays, userPreference);
+    setAiSuggestion(suggestion);
+    setIsAiLoading(false);
+    
+    // Auto-select if a specific bay is recommended and found
+    if (suggestion) {
+      const targetBay = selectedZone.bays.find(b => b.label === suggestion.bayId || b.id === suggestion.bayId);
+      if (targetBay) {
+        setSelectedBay(targetBay);
+      }
+    }
+  };
+
+  const rowToType = (row: string) => {
+    if (row === 'A') return "Premium";
+    if (row === 'B') return "Standard";
+    return "Economy";
+  };
+
+  const rowToPrice = (row: string) => {
+    if (row === 'A') return 15.00;
+    if (row === 'B') return 10.00;
+    return 7.50;
+  };
+
   const handleReserve = (zone: Zone) => {
+    setAiSuggestion(null);
+    setSelectedBay(null);
     if (zone.status === 'full') {
       setSelectedZone(zone);
       navigateTo('ai-suggestions');
@@ -692,11 +744,98 @@ export default function App() {
                 <span className="text-[9px] font-black text-white/50 uppercase tracking-widest">Reserved</span>
              </div>
              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-md bg-accent flex items-center justify-center shadow-[0_0_12px_rgba(0,132,13,0.3)]">
+                <div className="w-5 h-5 rounded-md bg-accent flex items-center justify-center shadow-[0_0_12px_rgba(252,163,17,0.3)]">
                    <ParkingCircle className="w-4 h-4 text-bg" />
                 </div>
                 <span className="text-[9px] font-black text-accent uppercase tracking-widest">Selected</span>
              </div>
+          </section>
+
+          {/* AI Suggestion Section */}
+          <section className="space-y-4">
+             <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-accent pulse-dot"></div>
+                   <h3 className="text-[10px] font-display text-white uppercase tracking-[2px]">Neural Choice</h3>
+                </div>
+                {!isAiLoading && !aiSuggestion && (
+                   <button 
+                      onClick={fetchAiSuggestion}
+                      className="text-[9px] font-black text-accent uppercase tracking-widest hover:opacity-80 transition-opacity flex items-center gap-1.5"
+                   >
+                      <Brain className="w-3.5 h-3.5" />
+                      Generate Suggestion
+                   </button>
+                )}
+             </div>
+
+             {!aiSuggestion && !isAiLoading && (
+               <div className="flex gap-2 px-2 overflow-x-auto pb-2 scrollbar-hide">
+                 {['Closest and Cheapest', 'Safest / Well Lit', 'Next to Entrance', 'Best Value'].map(pref => (
+                   <button 
+                     key={pref}
+                     onClick={() => setUserPreference(pref)}
+                     className={`whitespace-nowrap px-4 py-2 rounded-full text-[8px] font-black uppercase tracking-widest border transition-all
+                       ${userPreference === pref ? 'bg-accent border-accent text-bg shadow-lg shadow-accent/20' : 'bg-surface border-border text-dim hover:text-white'}
+                     `}
+                   >
+                     {pref}
+                   </button>
+                 ))}
+               </div>
+             )}
+
+             <AnimatePresence mode="wait">
+                {isAiLoading ? (
+                   <motion.div 
+                      key="loading"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="bg-card border-2 border-dashed border-accent/20 p-6 rounded-3xl flex flex-col items-center justify-center gap-3"
+                   >
+                      <div className="w-10 h-10 rounded-full border-2 border-accent border-t-transparent animate-spin"></div>
+                      <p className="text-[10px] text-muted font-bold uppercase tracking-widest animate-pulse">Analyzing Spot Efficiency...</p>
+                   </motion.div>
+                ) : aiSuggestion ? (
+                   <motion.div 
+                      key="suggestion"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-accent text-bg p-6 rounded-[32px] shadow-2xl shadow-accent/20 relative overflow-hidden group"
+                   >
+                      <div className="relative z-10 flex justify-between items-start">
+                         <div className="space-y-2">
+                            <div className="flex items-center gap-1.5">
+                               <div className="bg-bg/10 p-1.5 rounded-lg">
+                                  <Brain className="w-4 h-4" />
+                               </div>
+                               <span className="text-[10px] font-black uppercase tracking-widest opacity-60">AI Recommendation</span>
+                            </div>
+                            <h4 className="text-2xl font-display leading-none">Bay {aiSuggestion.bayId}</h4>
+                            <p className="text-[11px] font-medium leading-relaxed max-w-[200px] opacity-80">{aiSuggestion.reason}</p>
+                         </div>
+                         <div className="bg-bg/20 backdrop-blur-md border border-bg/10 p-4 rounded-2xl flex flex-col items-center">
+                            <span className="text-xl font-display leading-none">{aiSuggestion.convenienceScore}%</span>
+                            <span className="text-[8px] font-black uppercase tracking-widest mt-1 opacity-50">Match</span>
+                         </div>
+                      </div>
+                      
+                      <div className="mt-5 pt-5 border-t border-bg/10 flex justify-between items-center relative z-10">
+                         <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Est. Walk: {aiSuggestion.estimatedWalkingTime}</span>
+                         <button 
+                            onClick={fetchAiSuggestion}
+                            className="bg-bg/10 p-2 rounded-xl hover:bg-bg/20 transition-colors"
+                         >
+                            <Zap className="w-3.5 h-3.5" />
+                         </button>
+                      </div>
+
+                      {/* Animated circuit lines background */}
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-bg/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                   </motion.div>
+                ) : null}
+             </AnimatePresence>
           </section>
 
           {/* Map/Grid Section */}
