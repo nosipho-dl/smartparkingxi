@@ -1,0 +1,6 @@
+{
+  "name": "ScratchXI Smart Parking",
+  "description": "An intelligent campus parking management system for finding, reserving, and managing parking zones across DUT campuses.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

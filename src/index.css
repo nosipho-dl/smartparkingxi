@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Helvetica Neue', Arial, sans-serif;
+
+  --color-royal-blue: #0056b3;
+  --color-baby-blue: #e1f5fe;
+  --color-dut-purple: #673ab7;
+  --color-dut-purple-light: #f3e5f5;
+  --color-success: #2ecc71;
+  --color-error: #e74c3c;
+  --color-warning: #f1c40f;
+  --color-dark: #1a1a1a;
+  --color-gray: #7f8c8d;
+
+  /* Bay States */
+  --color-bay-available: var(--color-success);
+  --color-bay-occupied: var(--color-error);
+  --color-bay-reserved: var(--color-dut-purple);
+  --color-bay-selected: var(--color-royal-blue);
+}
+
+body {
+  background: linear-gradient(135deg, #e1f5fe 0%, #ffffff 100%);
+  @apply text-dark antialiased min-h-screen;
+}
+
+.auth-gradient {
+  background: linear-gradient(135deg, var(--color-dut-purple) 0%, var(--color-royal-blue) 100%);
+}
+
+.soft-shadow {
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+.themed-card {
+  @apply bg-white rounded-xl p-4 shadow-xs border-l-4 border-dut-purple;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.ai-box-gradient {
+  background: linear-gradient(135deg, #673ab7 0%, #0056b3 100%);
+}
