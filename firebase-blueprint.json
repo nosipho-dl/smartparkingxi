@@ -1,0 +1,114 @@
+{
+  "entities": {
+    "UserPublic": {
+      "title": "User Public Profile",
+      "description": "Publicly accessible user information",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["displayName", "createdAt"]
+    },
+    "UserPrivate": {
+      "title": "User Private Data",
+      "description": "Sensitive user information and preferences",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "phoneNumber": { "type": "string" },
+        "userPreference": { "type": "string" },
+        "isBlockedUntil": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "updatedAt"]
+    },
+    "Zone": {
+      "title": "Parking Zone",
+      "description": "A specific parking area",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "campus": { "type": "string" },
+        "type": { "type": "string" },
+        "capacity": { "type": "number" },
+        "used": { "type": "number" },
+        "status": { "type": "string", "enum": ["available", "limited", "full"] },
+        "location": { "type": "string" },
+        "distance": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "campus", "status", "capacity", "used"]
+    },
+    "Bay": {
+      "title": "Parking Bay",
+      "description": "An individual parking spot within a zone",
+      "type": "object",
+      "properties": {
+        "label": { "type": "string" },
+        "status": { "type": "string", "enum": ["available", "occupied", "reserved"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["label", "status", "updatedAt"]
+    },
+    "Booking": {
+      "title": "Parking Booking",
+      "description": "A reservation for a parking bay",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "zoneId": { "type": "string" },
+        "zoneName": { "type": "string" },
+        "bayId": { "type": "string" },
+        "bayLabel": { "type": "string" },
+        "startTime": { "type": "number" },
+        "expiryTime": { "type": "number" },
+        "durationHours": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "expired", "completed", "cancelled", "PENDING_CHECKIN", "APPROVED"] },
+        "arrivalTime": { "type": "number" },
+        "checkInTime": { "type": "number" },
+        "approvedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "zoneId", "bayId", "startTime", "expiryTime", "status", "createdAt"]
+    },
+    "Role": {
+      "title": "User Role",
+      "description": "System role assigned to a user",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["admin", "security", "user"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["role"]
+    }
+  },
+  "firestore": {
+    "/roles/{userId}": {
+      "schema": "Role",
+      "description": "Assigned roles for users"
+    },
+    "/users/{userId}/public/profile": {
+      "schema": "UserPublic",
+      "description": "Public profile of a user"
+    },
+    "/users/{userId}/private/info": {
+      "schema": "UserPrivate",
+      "description": "Private sensitive data of a user"
+    },
+    "/zones/{zoneId}": {
+      "schema": "Zone",
+      "description": "Top-level parking zones"
+    },
+    "/zones/{zoneId}/bays/{bayId}": {
+      "schema": "Bay",
+      "description": "Individual bays within a zone"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "All parking reservations"
+    }
+  }
+}

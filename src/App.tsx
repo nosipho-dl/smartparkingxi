@@ -17,12 +17,22 @@ import {
   ParkingCircle,
   Search, 
   Star, 
-  User, 
-  Zap 
+  User as UserIcon, 
+  Zap,
+  ArrowRight,
+  LogOut,
+  Calendar,
+  Check,
+  ShieldCheck,
+  Sparkles,
+  AlertTriangle
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ReactNode, useEffect, useState, useMemo } from 'react';
 import { getParkingSuggestion, ParkingSuggestion } from './services/geminiService';
+import { auth, signInWithGoogle, logout as firebaseLogout, testConnection, syncZones, syncUserBookings, syncUserProfile, updateUserPreference, saveBooking, updateBookingStatus, seedInitialData, requestArrival, approveCheckIn, syncPendingCheckins, syncUserRole } from './lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { AnimatedCar, SmartConnectivityBackground } from './components/Decorations';
 
 // --- Types ---
 type Screen = 
@@ -37,7 +47,8 @@ type Screen =
   | 'notifications' 
   | 'feedback'
   | 'profile'
-  | 'overstay-prompt';
+  | 'overstay-prompt'
+  | 'security-dashboard';
 
 interface Bay {
   id: string;
@@ -61,6 +72,7 @@ interface Zone {
 
 interface Booking {
   id: string;
+  userId: string;
   zoneId: string;
   zoneName: string;
   bayId: string;
@@ -68,7 +80,10 @@ interface Booking {
   startTime: number;
   expiryTime: number;
   durationHours: number;
-  status: 'pending' | 'confirmed' | 'expired' | 'completed';
+  status: 'pending' | 'confirmed' | 'expired' | 'completed' | 'cancelled' | 'PENDING_CHECKIN' | 'APPROVED';
+  arrivalTime?: number;
+  checkInTime?: number;
+  approvedBy?: string;
 }
 
 interface PastBooking {
@@ -131,14 +146,14 @@ const Button = ({
   className?: string;
   disabled?: boolean;
 }) => {
-  const base = "px-6 py-3 rounded-lg font-bold transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2 text-[13px] font-display uppercase tracking-widest";
+  const base = "px-8 py-4 rounded-[28px] font-bold transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-3 text-[14px] font-display tracking-tight";
   const variants = {
-    primary: "bg-accent text-bg shadow-lg shadow-accent/20",
-    secondary: "bg-accent-dim text-white border border-accent-mid/30",
-    outline: "border border-accent text-accent hover:bg-accent/10",
-    ghost: "bg-surface text-muted hover:text-white",
-    danger: "bg-error text-white shadow-lg shadow-error/20",
-    success: "bg-accent text-bg",
+    primary: "bg-[#2563eb] text-white shadow-xl shadow-blue-500/20 hover:bg-blue-700",
+    secondary: "bg-[#e0f2fe] text-[#2563eb] border border-blue-100",
+    outline: "border-2 border-[#2563eb] text-[#2563eb] hover:bg-blue-50",
+    ghost: "bg-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100",
+    danger: "bg-red-500 text-white shadow-xl shadow-red-500/20",
+    success: "bg-green-500 text-white shadow-xl shadow-green-500/20",
   };
 
   return (
@@ -163,31 +178,31 @@ const Header = ({
   onBack?: () => void;
   onNotify?: () => void;
 }) => (
-  <header className="px-6 py-4 flex items-center justify-between sticky top-0 bg-surface border-b border-border z-30">
-    <div className="flex items-center gap-3">
+  <header className="px-6 py-6 flex items-center justify-between sticky top-0 bg-white/70 backdrop-blur-md z-30">
+    <div className="flex items-center gap-4">
       {showBack && (
-        <button onClick={onBack} className="p-2 -ml-2 text-accent hover:bg-raised rounded-lg">
-          <ChevronLeft className="w-6 h-6" />
+        <button onClick={onBack} className="p-3 bg-white soft-shadow rounded-2xl text-slate-800 hover:bg-slate-50">
+          <ChevronLeft className="w-5 h-5" />
         </button>
       )}
-      <h1 className="text-sm font-display uppercase tracking-[3px] text-white">{title}</h1>
+      <h1 className="text-xl font-display font-semibold text-slate-900">{title}</h1>
     </div>
-    <button onClick={onNotify} className="p-2 bg-card border border-border rounded-lg relative">
-      <Bell className="w-5 h-5 text-muted" />
-      <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-accent rounded-full border border-bg pulse-dot"></span>
+    <button onClick={onNotify} className="p-3 bg-white soft-shadow rounded-2xl relative text-slate-600">
+      <Bell className="w-5 h-5" />
+      <span className="absolute top-3 right-3 w-2 h-2 bg-blue-500 rounded-full border-2 border-white"></span>
     </button>
   </header>
 );
 
 const Badge = ({ status }: { status: Zone['status'] }) => {
   const configs = {
-    available: { label: 'Open', color: 'bg-accent-dim/20 text-accent border border-accent/30' },
-    limited: { label: 'Limited', color: 'bg-amber-500/20 text-amber-400 border border-amber-500/30' },
-    full: { label: 'Full', color: 'bg-error/20 text-error border border-error/30' },
+    available: { label: 'Available', color: 'bg-green-100 text-green-700' },
+    limited: { label: 'Limited', color: 'bg-orange-100 text-orange-700' },
+    full: { label: 'Full', color: 'bg-red-100 text-red-700' },
   };
   const config = configs[status];
   return (
-    <span className={`px-2 py-0.5 rounded-md text-[8px] uppercase font-black tracking-widest ${config.color}`}>
+    <span className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-tight ${config.color}`}>
       {config.label}
     </span>
   );
@@ -203,12 +218,81 @@ export default function App() {
   const [selectedBay, setSelectedBay] = useState<Bay | null>(null);
   const [selectedDurationHours, setSelectedDurationHours] = useState<number>(0);
   const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
+  const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isBlockedUntil, setIsBlockedUntil] = useState<number | null>(null);
   const [aiSuggestion, setAiSuggestion] = useState<ParkingSuggestion | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [userPreference, setUserPreference] = useState("Closest and Cheapest");
+  const [user, setUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [pendingCheckins, setPendingCheckins] = useState<Booking[]>([]);
+
+  // Authentication & Connection Test
+  useEffect(() => {
+    testConnection();
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        setIsLoggedIn(true);
+        if (screen === 'login') navigateTo('home');
+        
+        // Seed if needed
+        seedInitialData(INITIAL_ZONES);
+      } else {
+        setIsLoggedIn(false);
+        setScreen('login');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time Firestore Sync
+  useEffect(() => {
+    if (!isLoggedIn || !user) return;
+
+    const unsubZones = syncZones((data) => {
+      setZones(data);
+    });
+
+    const unsubProfile = syncUserProfile(user.uid, (data) => {
+      if (data.type === 'private' && data.userPreference) {
+        setUserPreference(data.userPreference);
+      }
+    });
+
+    const unsubBookings = syncUserBookings(user.uid, (data) => {
+      setAllBookings(data as Booking[]);
+      // Find the most recent active booking if any
+      const active = data.find(b => b.status === 'pending' || b.status === 'confirmed' || b.status === 'PENDING_CHECKIN' || b.status === 'APPROVED');
+      if (active) {
+         setActiveBooking(active as Booking);
+      } else {
+         setActiveBooking(null);
+      }
+    });
+
+    const unsubRole = syncUserRole(user.uid, (role) => {
+      setUserRole(role);
+    });
+
+    return () => {
+      unsubZones();
+      unsubProfile();
+      unsubBookings();
+      unsubRole();
+    };
+  }, [isLoggedIn, user]);
+
+  // Security Sync
+  useEffect(() => {
+    if (userRole !== 'security' && userRole !== 'admin' && user?.email !== 'nosi.notes@gmail.com') return;
+    const unsub = syncPendingCheckins((data) => {
+      setPendingCheckins(data as Booking[]);
+    });
+    return () => unsub();
+  }, [userRole, user]);
 
   const navigateTo = (target: Screen) => {
     setHistory(prev => [...prev, target]);
@@ -274,9 +358,22 @@ export default function App() {
     return () => clearInterval(interval);
   }, [activeBooking, screen]);
 
-  const handleLogin = () => {
-    setIsLoggedIn(true);
-    navigateTo('home');
+  const handleLogin = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      console.error("Login failed", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await firebaseLogout();
+      setScreen('login');
+      setHistory(['login']);
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
   };
 
   const fetchAiSuggestion = async () => {
@@ -346,11 +443,12 @@ export default function App() {
     navigateTo('duration');
   };
 
-  const confirmReservation = () => {
-    if (!selectedZone || !selectedBay || !selectedDurationHours) return;
+  const confirmReservation = async () => {
+    if (!selectedZone || !selectedBay || !selectedDurationHours || !user) return;
     
     const booking: Booking = {
       id: Math.random().toString(36).substr(2, 9),
+      userId: user.uid,
       zoneId: selectedZone.id,
       zoneName: selectedZone.name,
       bayId: selectedBay.id,
@@ -361,59 +459,79 @@ export default function App() {
       status: 'pending'
     };
 
-    // Lock the bay
-    setZones(prev => prev.map(z => z.id === selectedZone.id ? {
-      ...z,
-      bays: z.bays.map(b => b.id === selectedBay.id ? { ...b, status: 'reserved' } : b)
-    } : z));
-
-    setActiveBooking(booking);
-    navigateTo('confirm');
-  };
-
-  const cancelBooking = () => {
-    if (activeBooking) {
-      setZones(prev => prev.map(z => z.id === activeBooking.zoneId ? {
-        ...z,
-        bays: z.bays.map(b => b.id === activeBooking.bayId ? { ...b, status: 'available' } : b)
-      } : z));
+    try {
+      await saveBooking(booking);
+      setActiveBooking(booking);
+      navigateTo('confirm');
+    } catch (error) {
+      console.error("Booking failed", error);
     }
-    setActiveBooking(null);
-    navigateTo('home');
   };
 
-  const checkIn = () => {
+  const cancelBooking = async () => {
+    if (activeBooking) {
+      try {
+        await updateBookingStatus(activeBooking.id, activeBooking.zoneId, activeBooking.bayId, 'cancelled', 'available');
+        setActiveBooking(null);
+        navigateTo('home');
+      } catch (error) {
+        console.error("Cancel failed", error);
+      }
+    }
+  };
+
+  const handleArrival = async () => {
+    if (activeBooking) {
+      try {
+        await requestArrival(activeBooking.id);
+        // Local state update will happen via sync
+      } catch (error) {
+        console.error("Arrival request failed", error);
+      }
+    }
+  };
+
+  const handleApprove = async (booking: Booking) => {
+    if (user) {
+      try {
+        await approveCheckIn(booking, user.uid);
+      } catch (error) {
+        console.error("Approval failed", error);
+      }
+    }
+  };
+
+  const checkIn = async () => {
     if (activeBooking) {
       // Once checked in, expiry time is set based on selected duration
       const expiry = Date.now() + (activeBooking.durationHours * 60 * 60 * 1000);
-      setActiveBooking({ ...activeBooking, status: 'confirmed', startTime: Date.now(), expiryTime: expiry });
-      
-      // Update bay to occupied
-      setZones(prev => prev.map(z => z.id === activeBooking.zoneId ? {
-        ...z,
-        bays: z.bays.map(b => b.id === activeBooking.bayId ? { ...b, status: 'occupied' } : b)
-      } : z));
-      
-      navigateTo('active');
+      try {
+        // Update booking status and bay status
+        await updateBookingStatus(activeBooking.id, activeBooking.zoneId, activeBooking.bayId, 'confirmed', 'occupied');
+        navigateTo('active');
+      } catch (error) {
+        console.error("Check-in failed", error);
+      }
     }
   };
 
-  const checkOut = () => {
+  const checkOut = async () => {
     if (activeBooking) {
-        // Free the bay
-        setZones(prev => prev.map(z => z.id === activeBooking.zoneId ? {
-            ...z,
-            bays: z.bays.map(b => b.id === activeBooking.bayId ? { ...b, status: 'available' } : b)
-        } : z));
-
-        // Penalty check: if expired and overstayed
-        if (timeLeft === 0 && activeBooking.status === 'confirmed') {
-            const blockedUntil = Date.now() + (24 * 60 * 60 * 1000); // 1 day penalty
-            setIsBlockedUntil(blockedUntil);
+        try {
+          await updateBookingStatus(activeBooking.id, activeBooking.zoneId, activeBooking.bayId, 'completed', 'available');
+          
+          // Penalty check: if expired and overstayed
+          if (timeLeft === 0 && activeBooking.status === 'confirmed') {
+              const blockedUntil = Date.now() + (24 * 60 * 60 * 1000); // 1 day penalty
+              setIsBlockedUntil(blockedUntil);
+          }
+          
+          setActiveBooking(null);
+          navigateTo('home');
+        } catch (error) {
+          console.error("Check-out failed", error);
         }
     }
-    setActiveBooking(null);
-    navigateTo('home');
   };
 
   const formatTime = (seconds: number) => {
@@ -425,53 +543,41 @@ export default function App() {
   // --- Render Screens ---
 
   const renderLogin = () => (
-    <div className="min-h-screen bg-bg flex flex-col justify-center px-8 py-12 text-white">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="mb-12 text-center"
-      >
-        <div className="w-[64px] h-[64px] bg-accent-dim rounded-[18px] mx-auto mb-[20px] flex items-center justify-center shadow-2xl border border-accent/20">
-          <BookHeart className="w-8 h-8 text-accent" />
+    <div className="min-h-screen flex flex-col justify-between p-10 relative overflow-hidden main-gradient">
+      <SmartConnectivityBackground />
+      
+      <div className="relative z-10 flex flex-col items-center justify-center flex-1 space-y-12">
+        <div className="space-y-4 text-center">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-20 h-20 bg-white/40 backdrop-blur-xl rounded-[24px] mx-auto flex items-center justify-center soft-shadow"
+          >
+            <ParkingCircle className="w-10 h-10 text-[#2563eb]" />
+          </motion.div>
+          <div className="space-y-1">
+            <h1 className="text-4xl font-display font-bold tracking-tight text-slate-900">Find Parking Smarter</h1>
+            <p className="text-slate-500 font-medium tracking-widest uppercase text-[10px] font-black italic mt-2">Group 19 Campus Finder</p>
+          </div>
         </div>
-        <h2 className="text-[32px] font-display text-white uppercase tracking-tighter">
-          SCRATCH <span className="text-accent">XI</span>
-        </h2>
-        <p className="text-[10px] text-muted font-sans uppercase tracking-[2px] mt-2">Smart Campus Parking System</p>
-      </motion.div>
 
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="space-y-6 max-w-xs mx-auto w-full"
-      >
-        <div className="space-y-4">
-          <div className="relative">
-             <input 
-              type="email" 
-              placeholder="Student ID / Email" 
-              className="w-full bg-surface border border-border rounded-[10px] px-5 py-4 text-sm focus:border-accent/50 border transition-all outline-hidden text-white placeholder:text-dim"
-            />
-          </div>
-          <div className="relative">
-             <input 
-              type="password" 
-              placeholder="Password" 
-              className="w-full bg-surface border border-border rounded-[10px] px-5 py-4 text-sm focus:border-accent/50 border transition-all outline-hidden text-white placeholder:text-dim"
-            />
-          </div>
+        <AnimatedCar />
+
+        <div className="w-full space-y-4">
+          <Button 
+            className="w-full py-5 rounded-[32px] text-lg" 
+            onClick={signInWithGoogle}
+          >
+            <Zap className="w-5 h-5 fill-current" />
+            Sign in with Google
+          </Button>
+          <p className="text-center text-[10px] uppercase font-black tracking-widest text-[#2563eb]/60">Student & Staff Entrance</p>
         </div>
-        
-        <Button onClick={handleLogin} className="w-full mt-2 !rounded-[12px] py-5 shadow-2xl">
-          Log In
-        </Button>
-        
-        <div className="flex justify-between items-center text-[10px] font-bold text-muted uppercase tracking-widest px-1">
-          <span className="cursor-pointer hover:text-accent transition-colors">Forgot Password</span>
-          <span onClick={handleLogin} className="cursor-pointer hover:text-accent transition-colors">Guest Mode</span>
-        </div>
-      </motion.div>
+      </div>
+
+      <div className="relative z-10 text-center py-4">
+        <p className="text-[10px] text-slate-400 font-medium">© 2026 DUT Parking Systems</p>
+      </div>
     </div>
   );
 
@@ -480,153 +586,151 @@ export default function App() {
     const isPenaltyActive = isBlockedUntil && isBlockedUntil > Date.now();
 
     return (
-      <div className="pb-24 bg-bg">
-        <Header title="Dashboard" onNotify={() => navigateTo('notifications')} />
+      <div className="min-h-screen pb-24 main-gradient relative overflow-hidden">
+        <SmartConnectivityBackground />
+        <Header title="" onNotify={() => navigateTo('notifications')} />
         
-        <main className="px-6 py-6 space-y-8">
-          <section className="flex justify-between items-end">
-             <div className="space-y-1">
-                <p className="text-[9px] font-sans font-bold text-dim uppercase tracking-[3px]">Student / Staff</p>
-                <h3 className="text-xl font-display text-white">Alex Henderson</h3>
-             </div>
-             <div className="w-11 h-11 bg-surface border border-border rounded-xl flex items-center justify-center">
-                <User className="w-5 h-5 text-accent" />
-             </div>
-          </section>
+        <main className="px-6 py-4 space-y-10 relative z-10">
+          <header className="space-y-1">
+            <h2 className="text-3xl font-display font-bold text-slate-900">Hey, {user?.displayName?.split(' ')[0] || 'User'} 👋</h2>
+            <div className="flex items-center gap-2">
+               <div className="w-1.5 h-1.5 rounded-full bg-blue-500 pulse-dot"></div>
+               <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Live Parking Intelligence</p>
+            </div>
+          </header>
 
           {isPenaltyActive && (
             <motion.section 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="p-5 bg-error/10 border border-error/30 rounded-2xl flex items-center gap-4"
+              className="p-6 bg-red-50 border border-red-100 rounded-[32px] flex items-center gap-5 soft-shadow"
             >
-              <div className="w-10 h-10 bg-error/20 rounded-xl flex items-center justify-center shrink-0">
-                 <Info className="w-5 h-5 text-error" />
+              <div className="w-12 h-12 bg-red-500 rounded-2xl flex items-center justify-center shrink-0">
+                 <Info className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
-                 <h4 className="font-display text-error text-[12px] uppercase tracking-wider">Breach Detected</h4>
-                 <p className="text-[10px] text-error/60 font-sans">Overstay penalty active. Next window in 24h.</p>
+                 <h4 className="font-display font-bold text-red-900 text-sm">Penalty Active</h4>
+                 <p className="text-xs text-red-600 font-medium">Please wait 24h to book again.</p>
               </div>
             </motion.section>
           )}
 
-          {/* Parking Stats Section */}
-          <div className="grid grid-cols-2 gap-3">
-             <div className="bg-surface border border-border p-5 rounded-3xl space-y-4">
-                <div className="flex justify-between items-start">
-                   <div className="w-8 h-8 bg-raised border border-border rounded-lg flex items-center justify-center">
-                      <Zap className="w-4 h-4 text-accent" />
-                   </div>
-                   <div className="w-2 h-2 rounded-full pulse-dot"></div>
-                </div>
-                <div>
-                   <p className="text-[20px] font-display text-white">{availableTotal}</p>
-                   <p className="text-[8px] font-bold text-muted uppercase tracking-widest">Available Spots</p>
-                </div>
-             </div>
-             
-             <button onClick={() => navigateTo('notifications')} className="bg-surface border border-border p-5 rounded-3xl space-y-4 text-left">
-                <div className="flex justify-between items-start">
-                   <div className="w-8 h-8 bg-raised border border-border rounded-lg flex items-center justify-center">
-                      <Bell className="w-4 h-4 text-muted" />
-                   </div>
-                </div>
-                <div>
-                   <p className="text-[20px] font-display text-white">3</p>
-                   <p className="text-[8px] font-bold text-muted uppercase tracking-widest">Active Alerts</p>
-                </div>
-             </button>
-          </div>
+          {activeBooking ? (
+            <motion.section 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="premium-card bg-[#2563eb] border-none text-white overflow-hidden relative shadow-2xl shadow-blue-500/30"
+            >
+               <div className="relative z-10 space-y-6">
+                  <div className="flex justify-between items-start">
+                     <div className="space-y-1">
+                        <span className="text-[10px] font-black uppercase tracking-[3px] text-blue-100/60">Active Booking</span>
+                        <h3 className="text-2xl font-display font-bold">{activeBooking.bayLabel} • {activeBooking.zoneName}</h3>
+                     </div>
+                     <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md">
+                        <Clock className="w-5 h-5" />
+                     </div>
+                  </div>
+                  
+                  <div className="flex items-end justify-between">
+                     <div className="space-y-1">
+                        <p className="text-[10px] font-bold text-blue-100/60 uppercase tracking-widest">Expires In</p>
+                        <p className="text-3xl font-display font-medium">{formatTime(timeLeft)}</p>
+                     </div>
+                     <Button 
+                        variant="secondary" 
+                        className="bg-white text-[#2563eb] border-none !px-6 !py-3 !rounded-2xl"
+                        onClick={() => navigateTo('active')}
+                     >
+                        View Ticket
+                     </Button>
+                  </div>
+               </div>
+               <Car className="absolute -bottom-10 -right-10 w-48 h-48 text-white/5 rotate-12" />
+            </motion.section>
+          ) : (
+            <motion.section 
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               onClick={() => !isPenaltyActive && navigateTo('zones')}
+               className={`premium-card bg-white cursor-pointer group transition-all hover:scale-[1.02] ${isPenaltyActive ? 'opacity-50 grayscale pointer-events-none' : ''}`}
+            >
+               <div className="flex items-center gap-6">
+                  <div className="w-20 h-20 bg-blue-50 rounded-[32px] flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                     <ParkingCircle className="w-10 h-10 text-[#2563eb]" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                     <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-display font-bold text-slate-900">Find Parking</h3>
+                        <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-[#2563eb] transition-all transform group-hover:translate-x-1" />
+                     </div>
+                     <p className="text-sm text-slate-500 font-medium">Discover open spots in seconds</p>
+                  </div>
+               </div>
+            </motion.section>
+          )}
 
-          {/* Main Actions */}
-          <section className="space-y-4">
-             <div className="flex justify-between items-center px-1">
-                <h4 className="text-[10px] font-display text-white uppercase tracking-[3px]">Menu</h4>
-                <div className="w-6 h-px bg-border"></div>
+          <section className="space-y-6">
+             <div className="flex items-center justify-between px-1">
+                <h3 className="text-lg font-display font-bold text-slate-900">Quick Stats</h3>
+                <div className="flex-1 h-px bg-slate-200 ml-4 max-w-[40px]"></div>
              </div>
              
-             <button 
-                onClick={() => !isPenaltyActive && navigateTo('zones')}
-                disabled={isPenaltyActive}
-                className={`w-full group relative overflow-hidden bg-card border border-border rounded-[20px] p-6 flex flex-col gap-5 transition-all active:scale-[0.97] ${isPenaltyActive ? 'opacity-40 grayscale pointer-events-none' : 'hover:border-accent-dim'}`}
-             >
-                <div className="flex justify-between items-start w-full relative z-10">
-                   <div className="w-12 h-12 bg-raised border border-border rounded-xl flex items-center justify-center">
-                      <Navigation className="w-6 h-6 text-accent" />
+             <div className="grid grid-cols-2 gap-4">
+                <div className="premium-card p-5 bg-emerald-50/50 space-y-4">
+                   <div className="p-2 w-fit rounded-xl bg-white soft-shadow">
+                      <Zap className="w-4 h-4 text-emerald-500" />
                    </div>
-                   <div className="h-6 w-11 bg-raised border border-border rounded-full p-1 flex items-center">
-                      <div className="w-4 h-4 bg-accent rounded-full shadow-[0_0_8px_rgba(0,0,13,0.5)]"></div>
+                   <div>
+                      <p className="text-2xl font-display font-bold text-slate-900 leading-none">{availableTotal}</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Free Slots</p>
                    </div>
                 </div>
-                <div className="text-left relative z-10">
-                   <p className="text-[12px] font-bold text-white mb-0.5">Find Parking</p>
-                   <p className="text-[10px] text-muted font-sans font-light">Select a zone to find and reserve a parking bay</p>
+                <div className="premium-card p-5 bg-purple-50/50 space-y-4">
+                   <div className="p-2 w-fit rounded-xl bg-white soft-shadow">
+                      <Star className="w-4 h-4 text-purple-500" />
+                   </div>
+                   <div>
+                      <p className="text-2xl font-display font-bold text-slate-900 leading-none">4</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Campus Zones</p>
+                   </div>
                 </div>
-                <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-accent/10 transition-all"></div>
-             </button>
+             </div>
           </section>
 
-          {activeBooking && (
-            <motion.section 
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              className="space-y-4"
-            >
-              <h4 className="text-[10px] font-display text-white uppercase tracking-[3px]">Current Booking</h4>
-              <div 
-                onClick={() => navigateTo('active')}
-                className="bg-card border-2 border-accent-dim rounded-3xl p-6 relative overflow-hidden cursor-pointer"
-              >
-                <div className="relative z-10 flex justify-between items-center">
-                   <div className="space-y-5">
-                      <div>
-                        <h4 className="text-lg font-display text-white">{activeBooking.zoneName}</h4>
-                        <div className="flex items-center gap-2">
-                           <div className="w-1.5 h-1.5 rounded-full bg-accent pulse-dot"></div>
-                           <p className="text-[9px] text-accent font-bold uppercase tracking-[2px]">Bay {activeBooking.bayLabel}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-6">
-                         <div>
-                            <p className="text-[7px] font-bold text-dim uppercase tracking-wider mb-0.5">Duration</p>
-                            <p className="text-[11px] font-display text-white">{activeBooking.durationHours}h</p>
-                         </div>
-                         <div>
-                            <p className="text-[7px] font-bold text-dim uppercase tracking-wider mb-0.5">Expiry</p>
-                            <p className="text-[11px] font-display text-accent">
-                               {new Date(activeBooking.expiryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                         </div>
-                      </div>
-                   </div>
-                   <div className="w-20 h-20 relative flex items-center justify-center">
-                      <svg className="w-full h-full transform -rotate-90">
-                         <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-raised" />
-                         <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="4" fill="transparent" strokeDasharray="201" strokeDashoffset={201 - (201 * (timeLeft / (activeBooking.durationHours * 3600)))} strokeLinecap="round" className="text-accent transition-all duration-1000" />
-                      </svg>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                         <span className="text-[11px] font-display text-white leading-none">{formatTime(timeLeft)}</span>
-                      </div>
-                   </div>
-                </div>
-              </div>
-            </motion.section>
-          )}
+          {/* AI Insight */}
+          <motion.div 
+             whileHover={{ y: -5 }}
+             className="bg-[#2563eb] p-7 rounded-[32px] text-white flex items-center gap-6 relative overflow-hidden soft-shadow"
+          >
+             <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-md relative z-10 shrink-0">
+                <Brain className="w-8 h-8 text-blue-100" />
+             </div>
+             <div className="space-y-1 relative z-10">
+                <span className="text-[9px] font-black uppercase tracking-[3px] text-blue-100/60">AI Smart Feed</span>
+                <p className="text-sm font-medium leading-relaxed">
+                  {zones.find(z => z.status === 'full') 
+                    ? `${zones.find(z => z.status === 'full')?.name} is busy. We recommend ${zones.find(z => z.status === 'available')?.name || 'North Parking'}.`
+                    : "The campus is quiet today. Park at the Entrance for the shortest walk!"}
+                </p>
+             </div>
+             <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+          </motion.div>
         </main>
-  
-        <nav className="fixed bottom-6 left-6 right-6 bg-surface border border-border rounded-[24px] px-6 py-3 flex items-center justify-between z-40 shadow-2xl">
+
+        <nav className="fixed bottom-6 left-6 right-6 bg-white/80 backdrop-blur-lg border border-white/20 rounded-[32px] px-8 py-4 flex items-center justify-between z-40 shadow-2xl">
           {[
             { s: 'home' as Screen, i: LayoutDashboard },
             { s: 'zones' as Screen, i: MapIcon },
             { s: 'active' as Screen, i: CalendarCheck },
-            { s: 'profile' as Screen, i: User }
+            { s: 'profile' as Screen, i: UserIcon }
           ].map(tab => (
             <button 
                key={tab.s}
                onClick={() => navigateTo(tab.s)} 
-               className={`p-3 rounded-xl transition-all ${screen === tab.s ? 'bg-accent text-bg shadow-lg shadow-accent/20 scale-110' : 'text-muted hover:text-white'}`}
+               className={`p-3 rounded-2xl transition-all ${screen === tab.s ? 'bg-[#2563eb] text-white shadow-lg shadow-blue-500/30 scale-110' : 'text-slate-400 hover:text-slate-900'}`}
             >
-              <tab.i className={`w-5 h-5 ${screen === tab.s ? 'stroke-3' : 'stroke-2'}`} />
+              <tab.i className={`w-6 h-6 ${screen === tab.s ? 'stroke-[2.5]' : 'stroke-2'}`} />
             </button>
           ))}
         </nav>
@@ -635,25 +739,26 @@ export default function App() {
   };
 
   const renderParkingZones = () => (
-    <div className="pb-24 bg-bg">
-      <Header title="Parking Map" showBack onBack={goBack} onNotify={() => navigateTo('notifications')} />
+    <div className="min-h-screen pb-24 main-gradient relative overflow-hidden">
+      <SmartConnectivityBackground />
+      <Header title="Station Finder" showBack onBack={goBack} onNotify={() => navigateTo('notifications')} />
       
-      <main className="px-6 py-6 space-y-6">
+      <main className="px-6 py-4 space-y-8 relative z-10">
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-dim w-4 h-4" />
+          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
           <input 
             type="text" 
             placeholder="Search zones..." 
-            className="w-full bg-card border border-border rounded-xl pl-11 pr-4 py-4 text-xs font-sans outline-hidden focus:border-accent/50 transition-all text-white placeholder:text-dim"
+            className="w-full bg-white soft-shadow rounded-3xl pl-14 pr-6 py-5 text-sm font-medium outline-none border border-transparent focus:border-blue-500/20 transition-all text-slate-900 placeholder:text-slate-400"
           />
         </div>
 
-        <div className="flex gap-3 pb-2 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-4 pb-2 overflow-x-auto scrollbar-hide px-1">
           {['All', 'Riverside', 'Indumiso', 'Steve Biko', 'Ritson', 'ML Sultan'].map(tag => (
             <button 
               key={tag} 
-              className={`px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap
-                ${tag === 'All' ? 'bg-accent text-bg shadow-md' : 'bg-surface border border-border text-muted'}
+              className={`px-6 py-3 rounded-2xl text-xs font-bold transition-all whitespace-nowrap
+                ${tag === 'All' ? 'bg-[#2563eb] text-white shadow-lg shadow-blue-500/20' : 'bg-white text-slate-500 hover:bg-slate-50'}
               `}
             >
               {tag}
@@ -661,43 +766,50 @@ export default function App() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 gap-3">
+        <div className="space-y-4">
           {zones.map(zone => (
             <motion.div 
               layoutId={zone.id}
               key={zone.id} 
-              className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-4 relative overflow-hidden transition-all hover:border-accent-dim active:bg-raised"
+              whileTap={{ scale: 0.98 }}
+              className="premium-card group cursor-pointer active:bg-slate-50 transition-all"
               onClick={() => handleReserve(zone)}
             >
-              <div className="flex justify-between items-start relative z-10">
-                <div className="space-y-1">
-                  <h4 className="text-[14px] font-display text-white">{zone.name}</h4>
-                  <div className="flex items-center gap-2 text-[9px] font-bold text-muted uppercase tracking-widest">
-                     <MapPin className="w-3 h-3 text-accent" />
-                     {zone.campus} Campus
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-[#2563eb]">
+                    <ParkingCircle className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-lg font-display font-bold text-slate-900 group-hover:text-[#2563eb] transition-colors">{zone.name}</h4>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                       <MapPin className="w-3.5 h-3.5 text-blue-400" />
+                       {zone.campus} Campus
+                    </div>
                   </div>
                 </div>
                 <Badge status={zone.status} />
               </div>
 
-              <div className="flex justify-between items-end relative z-10">
-                <div className="flex-1 space-y-2 max-w-[140px]">
-                   <div className="w-full h-1 bg-raised rounded-full overflow-hidden">
+              <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                <div className="flex-1 max-w-[180px] space-y-3">
+                   <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      <span>Occupancy</span>
+                      <span>{Math.round((zone.used / zone.capacity) * 100)}%</span>
+                   </div>
+                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                      <motion.div 
                         initial={false}
                         animate={{ width: `${(zone.used / zone.capacity) * 100}%` }}
-                        className={`h-full ${zone.status === 'full' ? 'bg-error' : 'bg-accent'}`}
+                        className={`h-full rounded-full ${zone.status === 'full' ? 'bg-red-500' : 'bg-[#2563eb]'}`}
                      />
                    </div>
-                   <p className="text-[8px] font-black text-dim uppercase tracking-tighter italic">
-                     {zone.status === 'full' ? 'Zone is full' : `${zone.capacity - zone.used} spots available`}
-                   </p>
                 </div>
-                <p className="text-[12px] font-display text-white leading-none">
-                   {zone.distance}
-                </p>
+                <div className="text-right">
+                   <p className="text-lg font-display font-bold text-slate-900">{zone.distance}</p>
+                   <p className="text-[10px] font-black uppercase tracking-widest text-[#2563eb]">Away</p>
+                </div>
               </div>
-              <div className="absolute top-0 right-0 w-24 h-24 bg-accent/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
             </motion.div>
           ))}
         </div>
@@ -717,37 +829,32 @@ export default function App() {
     const rows = Object.keys(baysByRow).sort();
 
     return (
-      <div className="min-h-screen pb-24 bg-bg">
-        <Header title="Select Spot" showBack onBack={goBack} />
+      <div className="min-h-screen pb-24 main-gradient relative overflow-hidden">
+        <SmartConnectivityBackground />
+        <Header title="Choose Spot" showBack onBack={goBack} />
         
-        <main className="px-6 py-6 flex flex-col gap-8">
+        <main className="px-6 py-4 flex flex-col gap-10 relative z-10">
           {/* Legend Section */}
-          <section className="bg-surface border border-border p-5 rounded-3xl grid grid-cols-2 gap-y-4 gap-x-8">
+          <section className="bg-white/50 backdrop-blur-xl border border-white/40 p-6 rounded-[32px] grid grid-cols-2 gap-y-5 gap-x-8 soft-shadow">
              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-md bg-accent/10 border border-accent/20 flex items-center justify-center">
-                   <div className="w-2.5 h-2.5 bg-accent rounded-sm"></div>
-                </div>
-                <span className="text-[9px] font-black text-white/50 uppercase tracking-widest">Available</span>
+                <div className="w-6 h-6 rounded-lg bg-emerald-500 shadow-lg shadow-emerald-500/20"></div>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Free</span>
              </div>
              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-md bg-error/10 border border-error/20 flex items-center justify-center">
-                   <div className="w-4 h-4 text-error">
-                      <Car className="w-full h-full" />
-                   </div>
+                <div className="w-6 h-6 rounded-lg bg-slate-200 flex items-center justify-center">
+                   <Car className="w-4 h-4 text-slate-400" />
                 </div>
-                <span className="text-[9px] font-black text-white/50 uppercase tracking-widest">Occupied</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Taken</span>
              </div>
              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-md bg-white/5 border border-white/10 flex items-center justify-center">
-                   <div className="w-2.5 h-2.5 bg-muted rounded-sm"></div>
-                </div>
-                <span className="text-[9px] font-black text-white/50 uppercase tracking-widest">Reserved</span>
+                <div className="w-6 h-6 rounded-lg bg-indigo-500/20 border-2 border-dashed border-indigo-500/30"></div>
+                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Booked</span>
              </div>
              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-md bg-accent flex items-center justify-center shadow-[0_0_12px_rgba(252,163,17,0.3)]">
-                   <ParkingCircle className="w-4 h-4 text-bg" />
+                <div className="w-6 h-6 rounded-lg bg-[#2563eb] shadow-lg shadow-blue-500/30 flex items-center justify-center">
+                   <Check className="w-4 h-4 text-white" />
                 </div>
-                <span className="text-[9px] font-black text-accent uppercase tracking-widest">Selected</span>
+                <span className="text-[10px] font-black text-[#2563eb] uppercase tracking-widest">Selected</span>
              </div>
           </section>
 
@@ -755,28 +862,31 @@ export default function App() {
           <section className="space-y-4">
              <div className="flex items-center justify-between px-2">
                 <div className="flex items-center gap-2">
-                   <div className="w-1.5 h-1.5 rounded-full bg-accent pulse-dot"></div>
-                   <h3 className="text-[10px] font-display text-white uppercase tracking-[2px]">Neural Choice</h3>
+                   <div className="w-2 h-2 rounded-full bg-blue-500 pulse-dot"></div>
+                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[3px]">Smart Selection</h3>
                 </div>
                 {!isAiLoading && !aiSuggestion && (
                    <button 
                       onClick={fetchAiSuggestion}
-                      className="text-[9px] font-black text-accent uppercase tracking-widest hover:opacity-80 transition-opacity flex items-center gap-1.5"
+                      className="text-[10px] font-black text-[#2563eb] uppercase tracking-widest hover:opacity-80 transition-opacity flex items-center gap-2"
                    >
-                      <Brain className="w-3.5 h-3.5" />
+                      <Brain className="w-4 h-4" />
                       Generate Suggestion
                    </button>
                 )}
              </div>
 
              {!aiSuggestion && !isAiLoading && (
-               <div className="flex gap-2 px-2 overflow-x-auto pb-2 scrollbar-hide">
+               <div className="flex gap-3 px-2 overflow-x-auto pb-2 scrollbar-hide px-1">
                  {['Closest and Cheapest', 'Safest / Well Lit', 'Next to Entrance', 'Best Value'].map(pref => (
                    <button 
                      key={pref}
-                     onClick={() => setUserPreference(pref)}
-                     className={`whitespace-nowrap px-4 py-2 rounded-full text-[8px] font-black uppercase tracking-widest border transition-all
-                       ${userPreference === pref ? 'bg-accent border-accent text-bg shadow-lg shadow-accent/20' : 'bg-surface border-border text-dim hover:text-white'}
+                     onClick={() => {
+                       setUserPreference(pref);
+                       if (user) updateUserPreference(user.uid, pref);
+                     }}
+                     className={`whitespace-nowrap px-6 py-3 rounded-2xl text-[10px] font-bold transition-all border
+                       ${userPreference === pref ? 'bg-[#2563eb] border-transparent text-white shadow-lg shadow-blue-500/20' : 'bg-white border-white text-slate-400 hover:text-[#2563eb] hover:bg-white'}
                      `}
                    >
                      {pref}
@@ -792,70 +902,71 @@ export default function App() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="bg-card border-2 border-dashed border-accent/20 p-6 rounded-3xl flex flex-col items-center justify-center gap-3"
+                      className="bg-white/50 backdrop-blur-xl border-2 border-dashed border-blue-500/20 p-8 rounded-[32px] flex flex-col items-center justify-center gap-4 soft-shadow"
                    >
-                      <div className="w-10 h-10 rounded-full border-2 border-accent border-t-transparent animate-spin"></div>
-                      <p className="text-[10px] text-muted font-bold uppercase tracking-widest animate-pulse">Analyzing Spot Efficiency...</p>
+                      <div className="w-12 h-12 rounded-full border-4 border-[#2563eb] border-t-transparent animate-spin"></div>
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest animate-pulse">Running Neural Optimization...</p>
                    </motion.div>
                 ) : aiSuggestion ? (
                    <motion.div 
                       key="suggestion"
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="bg-accent text-bg p-6 rounded-[32px] shadow-2xl shadow-accent/20 relative overflow-hidden group"
+                      className="bg-[#2563eb] text-white p-8 rounded-[40px] shadow-2xl shadow-blue-500/30 relative overflow-hidden group"
                    >
                       <div className="relative z-10 flex justify-between items-start">
-                         <div className="space-y-2">
-                            <div className="flex items-center gap-1.5">
-                               <div className="bg-bg/10 p-1.5 rounded-lg">
-                                  <Brain className="w-4 h-4" />
+                         <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                               <div className="bg-white/10 p-2 rounded-xl backdrop-blur-md">
+                                  <Brain className="w-5 h-5 text-blue-100" />
                                </div>
-                               <span className="text-[10px] font-black uppercase tracking-widest opacity-60">AI Recommendation</span>
+                               <span className="text-[10px] font-black uppercase tracking-widest text-blue-100/60">AI Recommendation</span>
                             </div>
-                            <h4 className="text-2xl font-display leading-none">Bay {aiSuggestion.bayId}</h4>
-                            <p className="text-[11px] font-medium leading-relaxed max-w-[200px] opacity-80">{aiSuggestion.reason}</p>
+                            <h4 className="text-3xl font-display font-bold leading-none">Bay {aiSuggestion.bayId}</h4>
+                            <p className="text-xs font-medium leading-relaxed max-w-[220px] text-blue-100/80">{aiSuggestion.reason}</p>
                          </div>
-                         <div className="bg-bg/20 backdrop-blur-md border border-bg/10 p-4 rounded-2xl flex flex-col items-center">
-                            <span className="text-xl font-display leading-none">{aiSuggestion.convenienceScore}%</span>
-                            <span className="text-[8px] font-black uppercase tracking-widest mt-1 opacity-50">Match</span>
+                         <div className="bg-white/10 backdrop-blur-md border border-white/10 p-5 rounded-3xl flex flex-col items-center shadow-xl">
+                            <span className="text-2xl font-display font-bold leading-none">{aiSuggestion.convenienceScore}%</span>
+                            <span className="text-[8px] font-black uppercase tracking-widest mt-1 text-blue-100/40">Efficiency</span>
                          </div>
                       </div>
                       
-                      <div className="mt-5 pt-5 border-t border-bg/10 flex justify-between items-center relative z-10">
-                         <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Est. Walk: {aiSuggestion.estimatedWalkingTime}</span>
+                      <div className="mt-8 pt-6 border-t border-white/10 flex justify-between items-center relative z-10">
+                         <span className="text-[10px] font-black uppercase tracking-widest text-blue-100/60 flex items-center gap-2">
+                            <Clock className="w-3.5 h-3.5" />
+                            ~{aiSuggestion.estimatedWalkingTime} Walk
+                         </span>
                          <button 
                             onClick={fetchAiSuggestion}
-                            className="bg-bg/10 p-2 rounded-xl hover:bg-bg/20 transition-colors"
+                            className="bg-white/10 p-2.5 rounded-2xl hover:bg-white/20 transition-colors"
                          >
-                            <Zap className="w-3.5 h-3.5" />
+                            <Zap className="w-4 h-4" />
                          </button>
                       </div>
 
-                      {/* Animated circuit lines background */}
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-bg/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                      <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-24 -mt-24 blur-3xl"></div>
                    </motion.div>
                 ) : null}
              </AnimatePresence>
           </section>
 
           {/* Map/Grid Section */}
-          <div className="bg-surface border border-border rounded-[40px] p-6 space-y-12 overflow-y-auto max-h-[500px] scrollbar-hide">
+          <div className="bg-white/40 backdrop-blur-xl border border-white/20 rounded-[48px] p-8 space-y-12 overflow-y-auto max-h-[600px] scrollbar-hide shadow-inner">
             {rows.map((rowName, idx) => (
               <div key={rowName} className="relative">
-                {/* Visual "Lane" Indicator after rows (except last) */}
                 {idx > 0 && (
-                   <div className="absolute inset-x-0 -top-8 h-px bg-linear-to-r from-transparent via-border to-transparent"></div>
+                   <div className="absolute inset-x-0 -top-6 h-[2px] bg-slate-100 rounded-full"></div>
                 )}
                 
-                <div className="flex items-start gap-5">
+                <div className="flex items-start gap-6">
                    {/* Row Label */}
-                   <div className="w-[44px] flex flex-col items-center justify-center py-4 bg-raised border border-border rounded-xl shrink-0">
-                      <span className="text-[8px] font-bold text-dim uppercase tracking-widest mb-1 leading-none">Row</span>
-                      <span className="text-xl font-display text-accent leading-none">{rowName}</span>
+                   <div className="w-14 flex flex-col items-center justify-center py-5 bg-white border border-slate-100 rounded-2xl shrink-0 soft-shadow">
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Row</span>
+                      <span className="text-2xl font-display font-bold text-[#2563eb]">{rowName}</span>
                    </div>
 
                    {/* Bay Items */}
-                   <div className="flex-1 grid grid-cols-5 gap-3">
+                   <div className="flex-1 grid grid-cols-5 gap-4">
                     {baysByRow[rowName].map(bay => (
                       <motion.button
                         key={bay.id}
@@ -863,60 +974,59 @@ export default function App() {
                         whileHover={{ scale: 1.05 }}
                         animate={selectedBay?.id === bay.id ? { y: -8, scale: 1.1 } : { y: 0, scale: 1 }}
                         onClick={() => selectBay(bay)}
-                        className={`relative w-full aspect-[3/4.5] rounded-xl flex flex-col items-center justify-between p-2 pb-1.5 border-2 transition-all overflow-hidden
-                          ${bay.status === 'occupied' ? 'bg-bg/20 border-border opacity-30 grayscale' : 
-                            bay.status === 'reserved' ? 'bg-card border-border/10' : 
-                            selectedBay?.id === bay.id ? 'bg-accent border-accent shadow-[0_0_20px_rgba(0,201,141,0.2)]' : 
-                            'bg-card border-border hover:border-accent-dim'}
+                        className={`relative w-full aspect-[3/5] rounded-[20px] flex flex-col items-center justify-between p-2 pb-2 transition-all overflow-hidden border-2
+                          ${bay.status === 'occupied' ? 'bg-slate-50 border-slate-100 opacity-60 grayscale' : 
+                            bay.status === 'reserved' ? 'bg-indigo-50/30 border-indigo-100' : 
+                            selectedBay?.id === bay.id ? 'bg-[#2563eb] border-[#2563eb] shadow-xl shadow-blue-500/20' : 
+                            'bg-white border-white hover:border-blue-100 shadow-sm'}
                         `}
                       >
-                        {/* Bay ID Label */}
-                        <span className={`text-[8px] font-bold ${selectedBay?.id === bay.id ? 'text-bg/60' : 'text-dim'}`}>
+                        <span className={`text-[9px] font-black tracking-widest ${selectedBay?.id === bay.id ? 'text-white/60' : 'text-slate-300'}`}>
                            {bay.label}
                         </span>
 
-                        {/* Centered Icon */}
                         <div className="flex-1 flex items-center justify-center w-full">
                            {bay.status === 'occupied' ? (
-                              <Car className="w-8 h-8 text-white/10" />
+                              <Car className="w-10 h-10 text-slate-200" />
                            ) : bay.status === 'reserved' ? (
-                              <div className="w-1.5 h-1.5 bg-muted rounded-full animate-pulse"></div>
+                              <div className="w-2 h-2 bg-indigo-300 rounded-full animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
                            ) : selectedBay?.id === bay.id ? (
-                              <ParkingCircle className="w-9 h-9 text-bg" />
+                              <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
+                                 <Check className="w-6 h-6 text-white" />
+                              </div>
                            ) : (
-                              <div className="w-[2px] h-[70%] bg-border/20 rounded-full"></div>
+                              <div className="w-[1.5px] h-[60%] bg-slate-100 rounded-full"></div>
                            )}
                         </div>
 
-                        {/* Bottom Status Dot */}
-                        <div className={`w-full h-1 rounded-full ${bay.status === 'occupied' ? 'bg-error' : bay.status === 'reserved' ? 'bg-muted' : selectedBay?.id === bay.id ? 'bg-bg' : 'bg-accent/20'}`}></div>
+                        <div className={`w-full h-1.5 rounded-full ${bay.status === 'occupied' ? 'bg-red-300' : bay.status === 'reserved' ? 'bg-indigo-300' : selectedBay?.id === bay.id ? 'bg-white' : 'bg-emerald-400'}`}></div>
                       </motion.button>
                     ))}
-                  </div>
+                   </div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Confirm/Select Drawer */}
           <AnimatePresence>
             {selectedBay && (
-                <motion.div 
-                   initial={{ y: 50, opacity: 0 }}
-                   animate={{ y: 0, opacity: 1 }}
-                   exit={{ y: 50, opacity: 0 }}
-                   className="bg-surface border border-accent rounded-[32px] flex items-center justify-between p-6 m-0 z-50 sticky bottom-4 shadow-2xl"
-                >
-                   <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                         <h4 className="font-display text-white text-lg">Bay {selectedBay.label}</h4>
-                      </div>
-                      <p className="text-[10px] text-accent uppercase font-black tracking-widest">Bay Available</p>
-                   </div>
-                   <Button onClick={proceedToDuration} className="shadow-[0_0_20px_rgba(0,201,141,0.4)]">
-                      Select Bay
-                   </Button>
-                </motion.div>
+              <motion.div 
+                 initial={{ opacity: 0, y: 50 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 exit={{ opacity: 0, y: 50 }}
+                 className="fixed bottom-24 left-6 right-6 z-50"
+              >
+                 <Button 
+                   onClick={proceedToDuration}
+                   className="w-full py-6 rounded-[32px] text-xl shadow-2xl shadow-blue-500/40 relative overflow-hidden"
+                 >
+                    <div className="flex items-center justify-center gap-3">
+                       <span>Reserve Bay {selectedBay.label}</span>
+                       <ArrowRight className="w-6 h-6" />
+                    </div>
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 blur-2xl"></div>
+                 </Button>
+              </motion.div>
             )}
           </AnimatePresence>
         </main>
@@ -925,41 +1035,42 @@ export default function App() {
   };
 
   const renderDurationSelect = () => (
-    <div className="min-h-screen pb-24 bg-bg">
-      <Header title="Duration" showBack onBack={goBack} />
-      <main className="px-6 py-8 space-y-12">
+    <div className="min-h-screen pb-24 main-gradient relative overflow-hidden">
+      <SmartConnectivityBackground />
+      <Header title="Stay Duration" showBack onBack={goBack} />
+      <main className="px-6 py-8 space-y-12 relative z-10">
         <div className="space-y-2">
-            <h3 className="text-2xl font-display text-white">Select Duration</h3>
-            <p className="text-muted text-sm font-sans">Choose how long you want to park.</p>
+            <h3 className="text-3xl font-display font-bold text-slate-900">Select Duration</h3>
+            <p className="text-slate-500 font-medium">How long will you be staying with us?</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-5">
            {[
-              { h: 1, label: 'Short Stay', range: '1.0 Hour', desc: 'Ideal for quick visits' },
-              { h: 4, label: 'Extended Stay', range: '4.0 Hours', desc: 'Ideal for lectures or meetings' },
-              { h: 8, label: 'Full Day', range: '8.0 Hours', desc: 'Valid for the entire day' }
+              { h: 1, label: 'Standard', range: '1.0 Hour', desc: 'Ideal for quick errands or visits', color: 'emerald' },
+              { h: 4, label: 'Lecture', range: '4.0 Hours', desc: 'Perfect for classes & meetings', color: 'blue' },
+              { h: 8, label: 'Long Stay', range: '8.0 Hours', desc: 'Valid for full campus day', color: 'indigo' }
            ].map(opt => (
               <button 
                 key={opt.h}
                 onClick={() => setSelectedDurationHours(opt.h)}
-                className={`p-6 rounded-[24px] border-2 text-left transition-all relative overflow-hidden group
-                  ${selectedDurationHours === opt.h ? 'bg-card border-accent' : 'bg-surface border-border'}
+                className={`premium-card p-6 border-2 text-left transition-all relative overflow-hidden group
+                  ${selectedDurationHours === opt.h ? `border-${opt.color}-500 bg-white` : 'bg-white border-white hover:border-slate-100'}
                 `}
               >
                 <div className="flex justify-between items-center relative z-10">
                    <div className="space-y-1">
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${selectedDurationHours === opt.h ? 'text-accent' : 'text-dim'}`}>
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${selectedDurationHours === opt.h ? `text-${opt.color}-500` : 'text-slate-400'}`}>
                          {opt.label}
-                      </p>
-                      <h4 className="font-display text-white text-xl">{opt.range}</h4>
-                      <p className="text-[10px] text-muted">{opt.desc}</p>
+                      </span>
+                      <h4 className="font-display font-bold text-2xl text-slate-900">{opt.range}</h4>
+                      <p className="text-xs text-slate-500 font-medium">{opt.desc}</p>
                    </div>
-                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-all ${selectedDurationHours === opt.h ? 'bg-accent/10 border-accent/30' : 'bg-raised border-border'}`}>
-                      <Clock className={`w-7 h-7 ${selectedDurationHours === opt.h ? 'text-accent' : 'text-muted'}`} />
+                   <div className={`w-16 h-16 rounded-[24px] flex items-center justify-center border transition-all ${selectedDurationHours === opt.h ? `bg-${opt.color}-50 border-${opt.color}-100` : 'bg-slate-50 border-slate-100'}`}>
+                      <Clock className={`w-8 h-8 ${selectedDurationHours === opt.h ? `text-${opt.color}-500` : 'text-slate-400'}`} />
                    </div>
                 </div>
                 {selectedDurationHours === opt.h && (
-                   <div className="absolute top-0 right-0 w-24 h-24 bg-accent/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
+                   <div className={`absolute top-0 right-0 w-24 h-24 bg-${opt.color}-500/5 rounded-full -mr-12 -mt-12 blur-2xl`}></div>
                 )}
               </button>
            ))}
@@ -967,11 +1078,11 @@ export default function App() {
 
         <div className="pt-8">
            <Button 
-                className="w-full shadow-[0_0_30px_rgba(0,201,141,0.3)]" 
+                className="w-full py-6 rounded-[32px] text-xl shadow-2xl shadow-blue-500/40" 
                 disabled={!selectedDurationHours}
                 onClick={confirmReservation}
            >
-              Confirm Booking
+              Confirm Reservation
            </Button>
         </div>
       </main>
@@ -979,128 +1090,166 @@ export default function App() {
   );
 
   const renderConfirm = () => (
-    <div className="min-h-screen flex flex-col items-center justify-center px-10 bg-bg text-center space-y-10">
+    <div className="min-h-screen flex flex-col items-center justify-center px-10 main-gradient text-center space-y-12 relative overflow-hidden">
+      <SmartConnectivityBackground />
       <motion.div 
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="w-24 h-24 bg-accent/10 border border-accent/30 rounded-[32px] flex items-center justify-center relative shadow-[0_0_40px_rgba(0,201,141,0.2)]"
+        className="w-32 h-32 bg-[#2563eb]/10 border border-[#2563eb]/30 rounded-[40px] flex items-center justify-center relative shadow-2xl relative z-10"
       >
-        <CheckCircle className="w-12 h-12 text-accent" />
-        <div className="absolute inset-0 rounded-[32px] border-2 border-accent animate-ping opacity-20"></div>
+        <CheckCircle className="w-16 h-16 text-[#2563eb]" />
+        <div className="absolute inset-0 rounded-[40px] border-4 border-[#2563eb] animate-ping opacity-10"></div>
       </motion.div>
 
-      <div className="space-y-4">
-        <h2 className="text-3xl font-display text-white">BOOKING <span className="text-accent text-[24px]">CONFIRMED</span></h2>
-        <p className="text-muted text-sm font-sans max-w-[240px] mx-auto leading-relaxed">
-           Reservation finalized at <span className="text-white font-bold">{selectedZone?.name}</span>. Your parking spot is reserved at bay <span className="text-accent font-bold">{selectedBay?.label}</span>.
+      <div className="space-y-4 relative z-10">
+        <h2 className="text-4xl font-display font-bold text-slate-900">Success!</h2>
+        <p className="text-slate-500 font-medium max-w-[280px] mx-auto leading-relaxed">
+           Your spot at <span className="text-[#2563eb] font-bold">{selectedZone?.name}</span> is ready. Just follow the navigation to <span className="text-[#2563eb] font-bold">Bay {selectedBay?.label}</span>.
         </p>
       </div>
 
-      <div className="bg-surface border border-border p-6 rounded-[28px] w-full space-y-4">
-         <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-widest text-dim px-2">
-            <span>Reservation Code</span>
-            <div className="w-1.5 h-1.5 rounded-full bg-accent pulse-dot"></div>
+      <div className="bg-white/50 backdrop-blur-xl border border-white/40 p-10 rounded-[48px] w-full space-y-8 soft-shadow relative z-10">
+         <div className="flex justify-between items-center text-[10px] uppercase font-black tracking-[4px] text-slate-400 px-2">
+            <span>Pass Code</span>
+            <div className="w-2 h-2 rounded-full bg-blue-500 pulse-dot"></div>
          </div>
-         <div className="bg-raised border border-border rounded-2xl py-6 flex flex-col items-center gap-2">
-            <span className="text-4xl font-display text-white tracking-[8px]">XI-904</span>
-            <span className="text-[10px] font-sans text-muted">15 MINUTE ARRIVAL WINDOW</span>
+         <div className="bg-blue-50 border border-blue-100 rounded-[32px] py-10 flex flex-col items-center gap-2">
+            <span className="text-5xl font-display font-bold text-[#2563eb] tracking-[12px] ml-[12px]">X9-J42</span>
+            <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest mt-2">15 MIN Arrival Window</span>
          </div>
       </div>
 
-      <Button onClick={() => navigateTo('home')} className="w-full">
-        Go to Dashboard
+      <Button onClick={() => navigateTo('home')} className="w-full py-6 rounded-[32px] text-xl shadow-2xl shadow-blue-500/40 relative z-10">
+        Back To Hub
       </Button>
     </div>
   );
 
   const renderActive = () => (
-    <div className="pb-24 bg-bg">
-      <Header title="My Ticket" showBack onBack={goBack} />
+    <div className="min-h-screen pb-24 main-gradient relative overflow-hidden">
+      <SmartConnectivityBackground />
+      <Header title="My Station" showBack onBack={goBack} />
       
-      <main className="px-6 py-6 space-y-8">
+      <main className="px-6 py-4 space-y-8 relative z-10">
         {!activeBooking ? (
-          <div className="py-20 text-center space-y-6">
-            <div className="w-20 h-20 bg-surface border border-border rounded-full mx-auto flex items-center justify-center text-dim">
-              <CalendarCheck className="w-10 h-10" />
+          <div className="py-24 text-center space-y-8 bg-white/40 backdrop-blur-xl rounded-[48px] border border-white/20 soft-shadow">
+            <div className="w-28 h-28 bg-blue-50 border border-blue-100 rounded-[40px] mx-auto flex items-center justify-center text-[#2563eb]">
+              <CalendarCheck className="w-14 h-14" />
             </div>
             <div className="space-y-2">
-               <h3 className="text-white font-display text-lg">No Active Bookings</h3>
-               <p className="text-muted text-xs font-sans">Book a parking spot to see your ticket.</p>
+               <h3 className="text-2xl font-display font-bold text-slate-900">No Active Booking</h3>
+               <p className="text-slate-400 font-medium">Ready for your next journey?</p>
             </div>
-            <Button onClick={() => navigateTo('zones')}>Find Parking</Button>
+            <Button onClick={() => navigateTo('zones')} className="px-10 py-5 rounded-3xl">Find Parking</Button>
           </div>
         ) : (
-          <>
-            <div className="bg-card rounded-[40px] border border-border text-center relative overflow-hidden shadow-2xl">
-               <div className="bg-accent p-8 text-bg space-y-2">
-                   <h4 className="text-[10px] uppercase font-black tracking-[0.4em] opacity-40 italic">Parking Reservation</h4>
-                   <h2 className="text-3xl font-display leading-tight">{activeBooking.zoneName}</h2>
-                   <div className="flex items-center justify-center gap-2 pt-2">
-                      <div className="px-3 py-1 bg-bg/10 rounded-full border border-bg/20">
-                         <span className="text-[10px] font-bold uppercase tracking-widest leading-none">Bay {activeBooking.bayLabel}</span>
-                      </div>
-                      <div className="px-3 py-1 bg-bg/10 rounded-full border border-bg/20">
-                         <span className="text-[10px] font-bold uppercase tracking-widest leading-none">Lvl 0{Math.floor(Math.random() * 3) + 1}</span>
+          <div className="space-y-8">
+            <div className="bg-white rounded-[56px] border border-white/40 text-center relative overflow-hidden shadow-2xl">
+               <div className="bg-[#2563eb] p-10 text-white space-y-4 relative overflow-hidden">
+                   <div className="relative z-10">
+                      <span className="text-[10px] uppercase font-black tracking-[0.6em] text-blue-100/50">Digital Entry Ticket</span>
+                      <h2 className="text-4xl font-display font-bold leading-tight mt-2">{activeBooking.zoneName}</h2>
+                      <div className="flex items-center justify-center gap-3 mt-6">
+                         <div className="px-5 py-2 bg-white/10 rounded-2xl backdrop-blur-lg border border-white/10">
+                            <span className="text-xs font-bold tracking-widest">Bay {activeBooking.bayLabel}</span>
+                         </div>
+                         <div className="px-5 py-2 bg-white/10 rounded-2xl backdrop-blur-lg border border-white/10">
+                            <span className="text-xs font-bold tracking-widest">Floor 0{Math.floor(Math.random() * 3) + 1}</span>
+                         </div>
                       </div>
                    </div>
+                   <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
+                   <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
                </div>
 
-               <div className="p-10 space-y-12">
-                  <div className="grid grid-cols-2 gap-8 text-left">
-                     <div className="p-4 bg-raised border border-border rounded-2xl">
-                        <p className="text-[8px] font-bold text-dim uppercase tracking-widest mb-1.5">Start Time</p>
-                        <p className="text-xl font-display text-white">{new Date(activeBooking.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+               <div className="p-10 space-y-12 bg-white">
+                  <div className="grid grid-cols-2 gap-6">
+                     <div className="p-6 bg-slate-50 border border-slate-100 rounded-3xl text-left">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 font-black">Started</p>
+                        <p className="text-2xl font-display font-bold text-slate-900">{new Date(activeBooking.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                      </div>
-                     <div className="p-4 bg-error/5 border border-error/20 rounded-2xl">
-                        <p className="text-[8px] font-bold text-error/60 uppercase tracking-widest mb-1.5">Expiry</p>
-                        <p className="text-xl font-display text-error">{new Date(activeBooking.expiryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                     <div className="p-6 bg-red-50 border border-red-100 rounded-3xl text-left">
+                        <p className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-2">Expiry</p>
+                        <p className="text-2xl font-display font-bold text-red-500">{new Date(activeBooking.expiryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                      </div>
                   </div>
 
                   {activeBooking.status === 'pending' ? (
-                    <div className="space-y-8">
-                        <div className="w-40 h-40 relative mx-auto flex flex-col items-center justify-center">
+                    <div className="space-y-10">
+                        <div className="w-48 h-48 relative mx-auto flex flex-col items-center justify-center">
                            <svg className="w-full h-full transform -rotate-90">
-                              <circle cx="80" cy="80" r="72" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-raised" />
-                              <circle 
-                                 cx="80" cy="80" r="72" 
-                                 stroke="currentColor" strokeWidth="8" fill="transparent" 
-                                 strokeDasharray="452" 
-                                 strokeDashoffset={452 - (452 * (timeLeft / (15 * 60)))} 
+                              <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-slate-100" />
+                              <motion.circle 
+                                 cx="96" cy="96" r="88" 
+                                 stroke="currentColor" strokeWidth="6" fill="transparent" 
+                                 strokeDasharray="553" 
+                                 strokeDashoffset={553 - (553 * (timeLeft / (15 * 60)))} 
                                  strokeLinecap="round" 
-                                 className="text-accent transition-all duration-1000" 
+                                 className="text-[#2563eb] transition-all duration-1000" 
                               />
                            </svg>
                            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                              <span className="text-3xl font-display text-white">{formatTime(timeLeft)}</span>
-                              <span className="text-[8px] font-black text-dim uppercase tracking-widest mt-1">Check-in Window</span>
+                              <span className="text-4xl font-display font-bold text-slate-900">{formatTime(timeLeft)}</span>
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-[3px] mt-2">Arrival Lock</span>
+                           </div>
+                        </div>
+                        <div className="space-y-4">
+                           <Button className="w-full py-6 rounded-[32px] text-xl shadow-2xl shadow-blue-500/30" onClick={handleArrival}>
+                              Capture Check-in
+                           </Button>
+                           <button onClick={cancelBooking} className="text-xs font-bold text-slate-400 hover:text-red-500 transition-colors uppercase tracking-widest">Cancel Reservation</button>
+                        </div>
+                    </div>
+                  ) : activeBooking.status === 'PENDING_CHECKIN' ? (
+                    <div className="space-y-10">
+                        <div className="w-48 h-48 relative mx-auto flex flex-col items-center justify-center">
+                           <div className="w-full h-full rounded-full border-4 border-dashed border-blue-500/20 animate-[spin_12s_linear_infinite] flex items-center justify-center">
+                              <ShieldCheck className="w-20 h-20 text-blue-500/20" />
+                           </div>
+                           <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-full">
+                              <motion.div 
+                                animate={{ scale: [1, 1.2, 1] }}
+                                transition={{ repeat: Infinity, duration: 2 }}
+                                className="w-16 h-16 bg-[#2563eb] rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/40"
+                              >
+                                 <Zap className="w-8 h-8" />
+                              </motion.div>
                            </div>
                         </div>
                         <div className="space-y-3">
-                           <Button className="w-full shadow-[0_0_20px_rgba(0,201,141,0.2)]" onClick={checkIn}>
-                              Check In
-                           </Button>
-                           <Button variant="ghost" className="w-full text-dim hover:text-white" onClick={cancelBooking}>
-                              Cancel Booking
-                           </Button>
+                           <h4 className="text-xl font-display font-bold text-slate-900">Awaiting Validation</h4>
+                           <p className="text-sm text-slate-400 font-medium px-4">Ground crew is currently verifying your bay allocation. Sit tight, pilot.</p>
                         </div>
+                        <button onClick={cancelBooking} className="text-xs font-bold text-slate-400 hover:text-red-500 transition-colors uppercase tracking-widest">Cancel Request</button>
                     </div>
                   ) : (
-                    <div className="space-y-10">
-                       <div className="w-48 h-48 bg-raised border border-border rounded-[32px] mx-auto flex items-center justify-center p-6 group transition-all hover:border-accent-dim">
-                          <div className="grid grid-cols-6 gap-2">
+                    <div className="space-y-12">
+                       <div className="bg-slate-50 p-10 rounded-[40px] flex items-center justify-center relative inner-shadow group overflow-hidden">
+                          <div className="relative z-10 grid grid-cols-6 gap-3">
                              {[...Array(36)].map((_, i) => (
-                               <div key={i} className={`w-4 h-4 rounded-[2px] ${Math.random() > 0.4 ? 'bg-accent shadow-[0_0_5px_rgba(0,201,141,0.4)]' : 'bg-transparent border border-border/20'}`}></div>
+                               <motion.div 
+                                 key={i} 
+                                 animate={{ opacity: [0.3, 1, 0.3], scale: [0.9, 1, 0.9] }}
+                                 transition={{ delay: i * 0.05, repeat: Infinity, duration: 3 }}
+                                 className={`w-3.5 h-3.5 rounded-sm ${Math.random() > 0.4 ? 'bg-[#2563eb] shadow-lg shadow-blue-500/30' : 'bg-slate-200'}`}
+                               ></motion.div>
                              ))}
                           </div>
+                          <div className="absolute inset-0 bg-blue-500/5 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity"></div>
                        </div>
+                       
                        <div className="space-y-4">
-                        <div className="flex items-center justify-center gap-2">
-                           <div className="w-2 h-2 rounded-full pulse-dot"></div>
-                           <p className="text-[10px] font-black text-accent uppercase tracking-[4px]">Verified Active</p>
+                        <div className="flex items-center justify-center gap-2 mb-4">
+                           <div className="w-2 h-2 rounded-full bg-emerald-500 pulse-dot"></div>
+                           <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[6px]">Secure Session {activeBooking.status === 'APPROVED' ? 'Granted' : 'Live'}</p>
                         </div>
-                        <Button className="w-full bg-error/10 border border-error/20 text-error hover:bg-error hover:text-white shadow-none" onClick={checkOut}>
-                            End Booking
+                        {activeBooking.status === 'APPROVED' && (
+                          <Button className="w-full py-6 rounded-[32px] text-xl shadow-2xl shadow-emerald-500/30 bg-emerald-500 hover:bg-emerald-600 border-none" onClick={checkIn}>
+                            Finalize Occupancy
+                          </Button>
+                        )}
+                        <Button className="w-full py-6 rounded-[32px] text-xl bg-slate-100 text-slate-400 border-none shadow-none hover:bg-red-50 hover:text-red-500 transition-all" onClick={checkOut}>
+                            Release Station
                         </Button>
                        </div>
                     </div>
@@ -1108,250 +1257,338 @@ export default function App() {
                </div>
 
                {/* Design Decoration */}
-               <div className="absolute left-0 top-[220px] -translate-x-4 w-8 h-8 bg-bg rounded-full border border-border"></div>
-               <div className="absolute right-0 top-[220px] translate-x-4 w-8 h-8 bg-bg rounded-full border border-border"></div>
+               <div className="absolute left-0 top-[220px] -translate-x-6 w-12 h-12 bg-slate-50 border border-slate-100 rounded-full soft-shadow"></div>
+               <div className="absolute right-0 top-[220px] translate-x-6 w-12 h-12 bg-slate-50 border border-slate-100 rounded-full soft-shadow"></div>
             </div>
-          </>
+          </div>
         )}
       </main>
     </div>
   );
 
+  const renderSecurityDashboard = () => (
+    <div className="min-h-screen pb-24 main-gradient relative overflow-hidden">
+      <SmartConnectivityBackground />
+      <Header title="Mission Control" onNotify={() => navigateTo('notifications')} />
+      <main className="px-6 py-4 space-y-8 relative z-10">
+        <div className="space-y-2">
+          <h3 className="text-3xl font-display font-bold text-slate-900">Validations</h3>
+          <p className="text-[10px] font-black uppercase tracking-[4px] text-[#2563eb]">Authorize entry requests</p>
+        </div>
+
+        <div className="space-y-6">
+          {pendingCheckins.length === 0 ? (
+            <div className="py-24 text-center space-y-6 bg-white/40 backdrop-blur-xl rounded-[48px] border border-white/20 soft-shadow">
+              <div className="w-20 h-20 bg-blue-50 border border-blue-100 rounded-3xl mx-auto flex items-center justify-center text-blue-300">
+                <ShieldCheck className="w-10 h-10" />
+              </div>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Clear queue. No requests.</p>
+            </div>
+          ) : (
+            pendingCheckins.map(booking => (
+              <motion.div 
+                key={booking.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="premium-card p-8 group relative overflow-hidden"
+              >
+                <div className="flex justify-between items-start mb-8">
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black text-[#2563eb] uppercase tracking-[4px]">Pass: {booking.id.slice(0, 6).toUpperCase()}</span>
+                    <h4 className="text-2xl font-display font-bold text-slate-900">{booking.bayLabel} • {booking.zoneName}</h4>
+                  </div>
+                  <div className="bg-blue-50 px-4 py-2 rounded-2xl border border-blue-100 flex flex-col items-center">
+                    <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest mb-1">Gate arrival</span>
+                    <span className="text-xs font-bold text-[#2563eb]">{new Date(booking.arrivalTime || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3 mb-8 p-4 bg-slate-50 rounded-2xl">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Subject Reference</p>
+                  <p className="text-xs text-slate-600 font-medium font-mono">{booking.userId}</p>
+                </div>
+
+                <div className="flex gap-4">
+                  <Button className="flex-1 py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-600 border-none" onClick={() => handleApprove(booking)}>
+                    Authorize
+                  </Button>
+                  <Button variant="ghost" className="flex-1 py-4 rounded-2xl bg-slate-100 text-slate-500 border-none hover:bg-red-50 hover:text-red-500" onClick={() => updateBookingStatus(booking.id, booking.zoneId, booking.bayId, 'pending', 'reserved')}>
+                    Decline
+                  </Button>
+                </div>
+                
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-blue-500/10 transition-all"></div>
+              </motion.div>
+            ))
+          )}
+        </div>
+      </main>
+
+      <nav className="fixed bottom-8 left-8 right-8 bg-white/80 backdrop-blur-2xl border border-white/40 rounded-[32px] px-8 py-4 flex items-center justify-between z-40 soft-shadow">
+        <button onClick={() => navigateTo('home')} className="p-3 rounded-2xl text-slate-400 hover:text-[#2563eb] hover:bg-blue-50 transition-all">
+          <LayoutDashboard className="w-6 h-6" />
+        </button>
+        <button className="bg-[#2563eb] text-white p-4 rounded-2xl shadow-xl shadow-blue-500/30 scale-110">
+          <Zap className="w-6 h-6" />
+        </button>
+        <button onClick={() => navigateTo('profile')} className="p-3 rounded-2xl text-slate-400 hover:text-[#2563eb] hover:bg-blue-50 transition-all">
+          <UserIcon className="w-6 h-6" />
+        </button>
+      </nav>
+    </div>
+  );
+
   const renderOverstayPrompt = () => (
-    <div className="min-h-screen flex flex-col items-center justify-center p-10 bg-bg text-center space-y-12">
-       <div className="w-24 h-24 bg-error/10 border border-error/30 rounded-[32px] flex items-center justify-center relative shadow-[0_0_40px_rgba(231,76,60,0.1)]">
-          <Clock className="w-12 h-12 text-error animate-pulse" />
-       </div>
-       <div className="space-y-4">
-          <h2 className="text-3xl font-display text-white italic">BOOKING EXPIRED</h2>
-          <p className="text-muted text-sm font-sans max-w-[280px] leading-relaxed italic">
-             Your 8-hour parking limit has been reached. Please extend your stay or check out to avoid penalties.
-          </p>
-       </div>
-       
-       <div className="w-full space-y-4">
-          <Button className="w-full shadow-[0_0_20px_rgba(0,201,141,0.2)]" onClick={() => navigateTo('home')}>
-             Extend Stay
-          </Button>
-          <Button variant="ghost" className="w-full border border-border text-dim hover:text-white" onClick={checkOut}>
-             End Booking
-          </Button>
-       </div>
+    <div className="min-h-screen flex flex-col items-center justify-center px-10 main-gradient text-center space-y-12 relative overflow-hidden">
+      <SmartConnectivityBackground />
+      <motion.div 
+        animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+        transition={{ repeat: Infinity, duration: 4 }}
+        className="w-32 h-32 bg-red-50 border border-red-100 rounded-[40px] flex items-center justify-center text-red-500 shadow-2xl relative z-10"
+      >
+        <Clock className="w-16 h-16" />
+      </motion.div>
+
+      <div className="space-y-4 relative z-10">
+        <h2 className="text-4xl font-display font-bold text-slate-900">Session Over</h2>
+        <p className="text-slate-500 font-medium max-w-[260px] mx-auto leading-relaxed">
+           Your reservation at <span className="text-red-500 font-bold">Bay {activeBooking?.bayLabel}</span> has expired. Please vacate or extend.
+        </p>
+      </div>
+
+      <div className="w-full space-y-4 relative z-10">
+        <Button onClick={() => setScreen('duration')} className="w-full py-6 rounded-[32px] text-xl shadow-lg shadow-blue-500/20">Extend Duration</Button>
+        <button onClick={checkOut} className="w-full py-6 rounded-[32px] text-lg font-bold text-slate-400 hover:text-red-500 transition-colors uppercase tracking-widest">End Session</button>
+      </div>
     </div>
   );
 
   const renderAISuggestions = () => (
-    <div className="pb-24 bg-bg">
-      <Header title="Suggestions" showBack onBack={goBack} />
-      
-      <main className="px-6 py-8 space-y-10">
-        <div className="text-center space-y-4">
-          <div className="w-24 h-24 bg-accent/10 border border-accent/30 rounded-[32px] mx-auto flex items-center justify-center relative shadow-[0_0_40px_rgba(0,201,141,0.1)]">
-            <Zap className="w-12 h-12 text-accent" />
-            <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-accent pulse-dot"></div>
-          </div>
-          <div className="space-y-1">
-             <h2 className="text-2xl font-display text-white">Zone Capacity Full</h2>
-             <p className="text-muted text-[10px] uppercase font-black tracking-widest italic opacity-50">Finding available alternatives...</p>
-          </div>
+    <div className="min-h-screen pb-24 main-gradient relative overflow-hidden">
+      <SmartConnectivityBackground />
+      <Header title="AI Intelligence" showBack onBack={goBack} />
+      <main className="px-6 py-4 space-y-8 relative z-10">
+        <div className="bg-white/40 backdrop-blur-2xl border border-white/20 p-10 rounded-[48px] shadow-2xl relative overflow-hidden group">
+           <div className="relative z-10 flex flex-col items-center text-center space-y-6">
+              <div className="w-24 h-24 bg-blue-500 rounded-[32px] flex items-center justify-center shadow-xl shadow-blue-500/40 relative">
+                 <div className="absolute inset-0 bg-white/20 animate-pulse rounded-[32px]"></div>
+                 <Sparkles className="w-12 h-12 text-white" />
+              </div>
+              <div className="space-y-2">
+                 <h3 className="text-2xl font-display font-bold text-slate-900 italic">Smart Navigator</h3>
+                 <p className="text-sm font-medium text-slate-500 leading-relaxed px-4">
+                    "I've analyzed real-time traffic. {selectedZone?.name} is reaching peak capacity. I suggest redirecting for 100% availability."
+                 </p>
+              </div>
+           </div>
+           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
         </div>
 
-        <div className="space-y-6">
-          <h3 className="text-[10px] font-display text-white uppercase tracking-[3px]">Alternative Zones</h3>
-          
-          <div className="space-y-4">
-            {zones.filter(z => z.status === 'available').slice(0, 2).map((zone, idx) => (
-              <motion.div 
-                key={zone.id} 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.1 }}
-                className="bg-card border border-border rounded-3xl p-6 relative overflow-hidden group hover:border-accent-dim transition-all"
-              >
-                <div className="relative z-10 flex justify-between items-center">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                       <span className="w-6 h-6 border border-accent/30 text-accent flex items-center justify-center rounded-lg text-[10px] font-display bg-accent/5">
-                         0{idx + 1}
-                       </span>
-                       <h4 className="font-display text-white text-lg">{zone.name}</h4>
+        <div className="space-y-4">
+           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] pl-2">Optimized Slots</h4>
+           <div className="space-y-4">
+              {zones.filter(z => z.status === 'available').slice(0, 3).map((zone, idx) => (
+                 <div key={zone.id} className="premium-card p-6 flex justify-between items-center group cursor-pointer hover:border-[#2563eb]/30 transition-all">
+                    <div className="space-y-1">
+                       <h5 className="font-display font-bold text-slate-900">{zone.name}</h5>
+                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">3 MIN Navigation • HIGH PROBABILITY</p>
                     </div>
-                    <p className="text-[10px] text-muted font-sans uppercase tracking-widest">{zone.campus} • Available Zone</p>
-                    <div className="flex items-center gap-2 text-[10px] font-black text-accent pt-2 uppercase tracking-wide">
-                       <Navigation className="w-3.5 h-3.5" />
-                       {zone.distance} ETA
+                    <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-[#2563eb] group-hover:bg-[#2563eb] group-hover:text-white transition-all">
+                       <Navigation className="w-6 h-6" />
                     </div>
-                  </div>
-                  <Button onClick={() => handleReserve(zone)}>
-                    Select
-                  </Button>
-                </div>
-                {idx === 0 && (
-                  <div className="absolute top-0 right-0 py-1 px-4 bg-accent/10 border-b border-l border-accent/30 text-accent text-[8px] font-black uppercase tracking-[3px] rounded-bl-xl italic">
-                    Best Match
-                  </div>
-                )}
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        <div className="p-6 bg-surface border-l-4 border-l-accent border border-border rounded-2xl space-y-3 relative overflow-hidden group">
-            <div className="flex items-center gap-2 mb-1">
-               <Zap className="w-3 h-3 text-accent fill-accent" />
-               <h4 className="text-[10px] font-black text-accent uppercase tracking-widest">Smart Tip</h4>
-            </div>
-            <p className="text-xs text-white/90 leading-relaxed font-sans italic">
-              {selectedZone?.name} is full. Diverting to <strong>Sports Centre</strong>. Historical data indicates 94% availability window for next 45 minutes.
-            </p>
-            <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-accent/10 transition-all"></div>
+                 </div>
+              ))}
+           </div>
         </div>
       </main>
     </div>
   );
 
   const renderNotifications = () => (
-    <div className="min-h-screen pb-24 bg-bg">
-      <Header title="Notifications" showBack onBack={goBack} />
-      <div className="px-6 py-6 space-y-4">
-        {MOCK_ALERTS.map((alert) => (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            key={alert.id} 
-            className={`p-5 rounded-[24px] border bg-surface flex gap-5 transition-all hover:border-accent-dim/30 ${alert.type === 'error' ? 'border-error/20' : alert.type === 'warning' ? 'border-warning/20' : 'border-border'}`}
-          >
-            <div className={`w-2.5 h-2.5 rounded-full mt-2.5 shrink-0 ${alert.type === 'error' ? 'bg-error shadow-[0_0_10px_rgba(231,76,60,0.5)]' : alert.type === 'warning' ? 'bg-warning shadow-[0_0_10px_rgba(241,196,15,0.5)]' : 'bg-accent shadow-[0_0_10px_rgba(0,201,141,0.5)]'}`}></div>
-            <div className="flex-1 space-y-2">
-              <div className="flex justify-between items-center">
-                <h4 className="text-[13px] font-display text-white">{alert.title}</h4>
-                <span className="text-[8px] text-dim font-black uppercase tracking-widest">{alert.time}</span>
-              </div>
-              <p className="text-[10px] text-muted font-sans leading-relaxed italic">{alert.message}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+    <div className="min-h-screen pb-24 main-gradient relative overflow-hidden">
+      <SmartConnectivityBackground />
+      <Header title="Alert Center" showBack onBack={goBack} />
+      <main className="px-6 py-4 space-y-8 relative z-10">
+        <div className="space-y-6">
+           {MOCK_ALERTS.map((alert, i) => (
+              <motion.div 
+                key={alert.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="premium-card p-6 flex items-start gap-6 group hover:scale-[1.02] transition-all"
+              >
+                 <div className={`w-14 h-14 rounded-2xl mt-1 flex items-center justify-center shrink-0 ${
+                    alert.type === 'error' ? 'bg-red-50 text-red-500' : 
+                    alert.type === 'warning' ? 'bg-amber-50 text-amber-500' : 'bg-blue-50 text-blue-500'
+                 }`}>
+                    {alert.type === 'error' ? <AlertTriangle className="w-8 h-8" /> : 
+                     alert.type === 'warning' ? <AlertTriangle className="w-8 h-8" /> : <Bell className="w-8 h-8" />}
+                 </div>
+                 <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                       <h4 className="font-display font-bold text-slate-900">{alert.title}</h4>
+                       <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{alert.time}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium leading-relaxed italic">{alert.message}</p>
+                 </div>
+              </motion.div>
+           ))}
+        </div>
+      </main>
     </div>
   );
 
   const renderFeedback = () => (
-    <div className="min-h-screen pb-24 bg-bg">
-      <Header title="Report an Issue" showBack onBack={goBack} />
-      <main className="px-6 py-8 space-y-10">
-        <div className="space-y-4">
-          <h2 className="text-2xl font-display text-white italic tracking-tight">Spot Report</h2>
-          <p className="text-muted text-xs font-sans leading-relaxed">Help us improve by reporting any discrepancies in zone availability. Report anomalies discovered in physical space.</p>
-        </div>
+    <div className="min-h-screen pb-24 main-gradient relative overflow-hidden">
+      <SmartConnectivityBackground />
+      <Header title="Ground Intel" showBack onBack={goBack} />
+      <main className="px-6 py-4 space-y-10 relative z-10">
+        <div className="p-10 bg-white/40 backdrop-blur-xl rounded-[48px] border border-white/20 soft-shadow space-y-8">
+           <div className="space-y-2 text-center">
+              <h3 className="text-2xl font-display font-bold text-slate-900">Experience Report</h3>
+              <p className="text-xs font-medium text-slate-400">Help us optimize the campus network</p>
+           </div>
+           
+           <div className="space-y-6">
+              <div className="space-y-3">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] pl-2">Subject Category</label>
+                 <div className="grid grid-cols-2 gap-4">
+                    {['Sensor Fault', 'Navigation', 'Billing', 'Safety'].map(cat => (
+                       <button key={cat} className="py-4 bg-slate-50 border border-slate-100 rounded-2xl text-[10px] font-black text-slate-500 hover:border-[#2563eb] hover:bg-blue-50 hover:text-[#2563eb] transition-all uppercase tracking-widest">{cat}</button>
+                    ))}
+                 </div>
+              </div>
+              
+              <div className="space-y-3">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] pl-2">Detailed Log</label>
+                 <textarea 
+                    className="w-full h-40 bg-slate-50 border border-slate-100 rounded-[32px] p-6 text-sm font-medium focus:outline-none focus:border-[#2563eb] transition-all placeholder:text-slate-300" 
+                    placeholder="Describe the anomaly..."
+                 />
+              </div>
 
-        <div className="space-y-8">
-          <div className="space-y-3">
-             <label className="text-[9px] font-black uppercase text-dim tracking-[3px]">Select Zone</label>
-             <div className="relative">
-                <select className="w-full bg-surface border border-border rounded-xl px-5 py-4 text-xs font-sans text-white outline-hidden appearance-none focus:border-accent/30 transition-all">
-                   <option>Select zone...</option>
-                   {zones.map(z => <option key={z.id}>{z.name}</option>)}
-                </select>
-                <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-dim rotate-90 pointer-events-none" />
-             </div>
-          </div>
-
-          <div className="space-y-3">
-             <label className="text-[9px] font-black uppercase text-dim tracking-[3px]">What do you see?</label>
-             <div className="grid grid-cols-2 gap-4">
-                <button className="p-5 rounded-2xl bg-card border border-border text-center hover:border-accent/40 transition-all flex flex-col items-center gap-3 group">
-                   <div className="w-2.5 h-2.5 bg-accent rounded-full pulse-dot"></div>
-                   <span className="font-display text-white text-[12px] uppercase">Spot is Empty</span>
-                </button>
-                <button className="p-5 rounded-2xl bg-card border border-border text-center hover:border-error/40 transition-all flex flex-col items-center gap-3 group">
-                   <div className="w-2.5 h-2.5 bg-error rounded-full shadow-[0_0_10px_rgba(231,76,60,0.5)]"></div>
-                   <span className="font-display text-white text-[12px] uppercase">Zone is Full</span>
-                </button>
-             </div>
-          </div>
-
-          <div className="space-y-3">
-             <label className="text-[9px] font-black uppercase text-dim tracking-[3px]">Additional Details</label>
-             <textarea 
-               placeholder="Describe the issue..." 
-               className="w-full bg-surface border border-border rounded-2xl px-5 py-5 min-h-[140px] text-xs font-sans outline-hidden text-white placeholder:text-dim focus:border-accent/30 transition-all"
-             ></textarea>
-          </div>
-
-          <div className="pt-4">
-             <Button 
-               className="w-full shadow-[0_0_20px_rgba(0,201,141,0.2)]" 
-               onClick={() => {
-                 navigateTo('home');
-               }}
-             >
-               Submit Report
-             </Button>
-          </div>
+              <Button className="w-full py-6 rounded-[32px] text-xl shadow-2xl shadow-blue-500/30" onClick={() => {
+                alert('Intelligence received. Thank you, traveler.');
+                navigateTo('home');
+              }}>Transmit Intel</Button>
+           </div>
         </div>
       </main>
     </div>
   );
 
   const renderProfile = () => (
-    <div className="pb-24 bg-bg">
-      <Header title="Profile" onNotify={() => navigateTo('notifications')} />
+    <div className="min-h-screen pb-24 main-gradient relative overflow-hidden">
+      <SmartConnectivityBackground />
+      <Header title="My Persona" onNotify={() => navigateTo('notifications')} />
       
-      <main className="px-6 py-6 space-y-10">
-         <section className="text-center space-y-5 pb-4">
-            <div className="w-28 h-28 bg-surface border-4 border-raised rounded-full mx-auto flex items-center justify-center relative shadow-2xl">
-               <span className="text-4xl font-display text-accent">AH</span>
-               <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-accent rounded-xl border-4 border-bg flex items-center justify-center">
-                  <User className="w-4 h-4 text-bg" />
-               </div>
+      <main className="px-6 py-4 space-y-12 relative z-10">
+         <section className="text-center space-y-6 pb-6 relative">
+            <div className="relative inline-block">
+              <div className="w-32 h-32 bg-white rounded-full mx-auto flex items-center justify-center relative soft-shadow border-4 border-white overflow-hidden">
+                 {user?.photoURL ? (
+                    <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                 ) : (
+                    <span className="text-5xl font-display font-bold text-[#2563eb]">
+                      {user?.displayName ? user.displayName.split(' ').map(n => n[0]).join('') : 'U'}
+                    </span>
+                 )}
+              </div>
+              <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-[#2563eb] rounded-2xl border-4 border-white flex items-center justify-center shadow-lg">
+                <UserIcon className="w-5 h-5 text-white" />
+              </div>
             </div>
+            
             <div className="space-y-1">
-               <h2 className="text-2xl font-display text-white">Alex Henderson</h2>
-               <p className="text-muted text-[10px] font-black uppercase tracking-[3px] italic">Student / Staff</p>
+               <h2 className="text-3xl font-display font-bold text-slate-900">{user?.displayName || 'Traveler'}</h2>
+               <div className="flex items-center justify-center gap-2">
+                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                 <p className="text-[10px] font-black uppercase tracking-[4px] text-slate-400">{user?.email || 'ID: ST-2024'}</p>
+               </div>
             </div>
          </section>
 
          {activeBooking && (
            <section className="space-y-4">
-             <h3 className="text-[10px] font-display text-white uppercase tracking-[3px]">Active Booking</h3>
+             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] pl-2">Session Active</h3>
              <motion.div 
                whileTap={{ scale: 0.98 }}
-               className="bg-card border-2 border-accent/30 p-6 rounded-[32px] cursor-pointer relative overflow-hidden group" 
+               className="bg-[#2563eb] text-white p-8 rounded-[40px] shadow-2xl shadow-blue-500/30 cursor-pointer relative overflow-hidden group" 
                onClick={() => navigateTo('active')}
              >
-                <div className="flex justify-between items-start mb-4 relative z-10">
+                <div className="flex justify-between items-start mb-6 relative z-10">
                    <div className="space-y-1">
-                      <h4 className="font-display text-white text-lg">{activeBooking.zoneName}</h4>
-                      <p className="text-[9px] text-accent font-black uppercase tracking-widest italic">ID: #BK-{activeBooking.id.toUpperCase()}</p>
+                      <h4 className="font-display font-bold text-2xl">{activeBooking.zoneName}</h4>
+                      <p className="text-[10px] text-blue-100/60 font-black uppercase tracking-widest italic">REF: #{activeBooking.id.toUpperCase()}</p>
                    </div>
-                   <div className="w-2 h-2 rounded-full pulse-dot"></div>
+                   <div className="w-3 h-3 rounded-full bg-white pulse-dot"></div>
                 </div>
-                <div className="pt-5 border-t border-border flex justify-between items-center relative z-10">
-                   <span className="text-[9px] font-black text-white uppercase tracking-widest italic">Expires in <span className="text-accent">{formatTime(timeLeft)}</span></span>
-                   <ChevronRight className="w-4 h-4 text-dim group-hover:text-accent transition-colors" />
+                <div className="pt-6 border-t border-white/10 flex justify-between items-center relative z-10">
+                   <span className="text-[10px] font-black uppercase tracking-widest text-blue-100/80">Expires in <span className="text-white font-bold">{formatTime(timeLeft)}</span></span>
+                   <div className="bg-white/10 p-2 rounded-xl backdrop-blur-md">
+                      <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                   </div>
                 </div>
-                <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
              </motion.div>
            </section>
          )}
 
-         <section className="space-y-4">
-            <h3 className="text-[10px] font-display text-white uppercase tracking-[3px]">Booking History</h3>
-            <div className="space-y-3">
-               {MOCK_HISTORY.map(history => (
-                  <div key={history.id} className="bg-surface border border-border p-5 rounded-2xl flex justify-between items-center group transition-all hover:border-accent-dim">
-                     <div className="space-y-1.5">
-                        <h4 className="text-[11px] font-display text-white">{history.zoneName}</h4>
+         <section className="space-y-6">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] pl-2">Security Hub</h3>
+            <div className="space-y-4">
+              <Button 
+                 className="w-full py-5 rounded-[28px] bg-slate-900 text-white border-none hover:bg-slate-800" 
+                 onClick={() => navigateTo('security-dashboard')}
+              >
+                 <div className="flex items-center justify-center gap-3">
+                    <ShieldCheck className="w-5 h-5" />
+                    <span>Access Portal</span>
+                 </div>
+              </Button>
+              {(user?.email === 'nosi.notes@gmail.com') && (
+                 <button 
+                    className="w-full py-4 rounded-[24px] border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-[#2563eb] hover:border-[#2563eb] transition-all"
+                    onClick={async () => {
+                      const { setDoc, doc, serverTimestamp } = await import('firebase/firestore');
+                      const { db } = await import('./lib/firebase');
+                      await setDoc(doc(db, 'roles', user.uid), {
+                        role: userRole === 'security' ? 'user' : 'security',
+                        updatedAt: serverTimestamp()
+                      });
+                    }}
+                 >
+                    Cycle Authorization Level ({userRole || 'standard'})
+                 </button>
+              )}
+            </div>
+         </section>
+
+         <section className="space-y-6">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] pl-2">Session Archive</h3>
+            <div className="space-y-4">
+               {allBookings.filter(b => b.status === 'completed' || b.status === 'cancelled').length === 0 && (
+                 <div className="py-12 bg-white/40 rounded-[32px] border border-white/20 text-center">
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Archive Empty</p>
+                 </div>
+               )}
+               {allBookings.filter(b => b.status === 'completed' || b.status === 'cancelled').sort((a,b) => b.startTime - a.startTime).map(booking => (
+                  <div key={booking.id} className="bg-white/60 backdrop-blur-xl border border-white/40 p-6 rounded-[32px] flex justify-between items-center group hover:bg-white transition-all soft-shadow">
+                     <div className="space-y-2">
+                        <h4 className="text-sm font-display font-bold text-slate-900">{booking.zoneName}</h4>
                         <div className="flex items-center gap-2">
-                           <div className="w-1 h-1 rounded-full bg-dim"></div>
-                           <p className="text-[8px] text-muted uppercase font-black tracking-widest">{history.date} • {history.time}</p>
+                           <Calendar className="w-3 h-3 text-slate-300" />
+                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                             {new Date(booking.startTime).toLocaleDateString()}
+                           </p>
                         </div>
                      </div>
-                     <div className="flex items-center gap-3">
-                        <span className={`text-[8px] font-black uppercase tracking-[2px] italic ${history.status === 'completed' ? 'text-accent' : 'text-error opacity-60'}`}>
-                           {history.status}
+                     <div className="flex items-center gap-4">
+                        <span className={`text-[9px] font-black uppercase tracking-widest ${booking.status === 'completed' ? 'text-emerald-500' : 'text-red-400'}`}>
+                           {booking.status}
                         </span>
-                        <div className={`w-1.5 h-1.5 rounded-full ${history.status === 'completed' ? 'bg-accent' : 'bg-error'}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${booking.status === 'completed' ? 'bg-emerald-500' : 'bg-red-400'}`}></div>
                      </div>
                   </div>
                ))}
@@ -1359,26 +1596,26 @@ export default function App() {
          </section>
 
          <button 
-           onClick={() => navigateTo('login')}
-           className="w-full flex items-center justify-center p-5 bg-error/5 border border-error/20 rounded-2xl group transition-all hover:bg-error hover:border-error"
+           onClick={handleLogout}
+           className="w-full flex items-center justify-center py-6 bg-red-50 rounded-[32px] group hover:bg-red-500 transition-all border border-red-100"
          >
-            <span className="text-[10px] font-black text-error uppercase tracking-[4px] group-hover:text-white transition-colors">Log Out</span>
+            <span className="text-[10px] font-black text-red-500 uppercase tracking-[6px] group-hover:text-white transition-colors">Terminate Identity</span>
          </button>
       </main>
 
-      <nav className="fixed bottom-6 left-6 right-6 bg-surface border border-border rounded-[24px] px-6 py-3 flex items-center justify-between z-40 shadow-2xl">
+      <nav className="fixed bottom-8 left-8 right-8 bg-white/80 backdrop-blur-2xl border border-white/40 rounded-[32px] px-8 py-4 flex items-center justify-between z-40 soft-shadow">
         {[
           { s: 'home' as Screen, i: LayoutDashboard },
           { s: 'zones' as Screen, i: MapIcon },
           { s: 'active' as Screen, i: CalendarCheck },
-          { s: 'profile' as Screen, i: User }
+          { s: 'profile' as Screen, i: UserIcon }
         ].map(tab => (
           <button 
              key={tab.s}
              onClick={() => navigateTo(tab.s)} 
-             className={`p-3 rounded-xl transition-all ${screen === tab.s ? 'bg-accent text-bg shadow-lg shadow-accent/20 scale-110' : 'text-muted hover:text-white'}`}
+             className={`p-3 rounded-2xl transition-all ${screen === tab.s ? 'bg-[#2563eb] text-white shadow-xl shadow-blue-500/30 scale-110' : 'text-slate-400 hover:text-[#2563eb] hover:bg-blue-50'}`}
           >
-            <tab.i className={`w-5 h-5 ${screen === tab.s ? 'stroke-3' : 'stroke-2'}`} />
+            <tab.i className={`w-6 h-6 ${screen === tab.s ? 'stroke-3' : 'stroke-2'}`} />
           </button>
         ))}
       </nav>
@@ -1386,14 +1623,14 @@ export default function App() {
   );
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-bg relative shadow-2xl overflow-x-hidden">
+    <div className="max-w-md mx-auto min-h-screen bg-[#f8fafc] relative shadow-2xl overflow-x-hidden font-sans">
       <AnimatePresence mode="wait">
         <motion.div
           key={screen}
-          initial={{ opacity: 0, x: 10 }}
+          initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -10 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
           className="min-h-screen"
         >
           {screen === 'login' && renderLogin()}
@@ -1408,6 +1645,7 @@ export default function App() {
           {screen === 'feedback' && renderFeedback()}
           {screen === 'profile' && renderProfile()}
           {screen === 'overstay-prompt' && renderOverstayPrompt()}
+          {screen === 'security-dashboard' && renderSecurityDashboard()}
         </motion.div>
       </AnimatePresence>
     </div>

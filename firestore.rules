@@ -1,0 +1,173 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    // Role checks
+    function hasRole(role) {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles/$(request.auth.uid)) 
+        && get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'nosi.notes@gmail.com' ||
+        hasRole('admin')
+      );
+    }
+
+    function isSecurity() {
+      return isSignedIn() && (
+        hasRole('security') ||
+        isAdmin()
+      );
+    }
+
+    // Entity Validations
+    function isValidUserPublic(data) {
+      return data.keys().hasAll(['displayName', 'createdAt']) 
+        && data.keys().size() == 2
+        && data.displayName is string && data.displayName.size() >= 2 && data.displayName.size() <= 100
+        && data.createdAt == request.time;
+    }
+
+    function isValidUserPrivate(data) {
+      return data.keys().hasAll(['email', 'updatedAt'])
+        && data.email is string && data.email.size() <= 200
+        && data.updatedAt == request.time
+        && (data.keys().size() <= 6); // Allowance for userPreference, isBlockedUntil, phoneNumber
+    }
+
+    function isValidZone(data) {
+      return data.keys().hasAll(['name', 'campus', 'status', 'capacity', 'used'])
+        && data.name is string && data.name.size() <= 100
+        && data.campus is string && data.campus.size() <= 100
+        && data.status in ['available', 'limited', 'full']
+        && data.capacity is int && data.used is int
+        && data.used >= 0 && data.used <= data.capacity;
+    }
+
+    function isValidBay(data) {
+      return data.keys().hasAll(['label', 'status', 'updatedAt'])
+        && data.label is string && data.label.size() <= 16
+        && data.status in ['available', 'occupied', 'reserved']
+        && data.updatedAt == request.time;
+    }
+
+    function isValidBooking(data, isUpdate) {
+      return data.keys().hasAll(['userId', 'zoneId', 'bayId', 'startTime', 'expiryTime', 'status', 'createdAt', 'updatedAt'])
+        && data.userId is string
+        && isValidId(data.zoneId) && isValidId(data.bayId)
+        && data.status in ['pending', 'confirmed', 'expired', 'completed', 'cancelled', 'PENDING_CHECKIN', 'APPROVED']
+        && data.startTime is int && data.expiryTime is int
+        && data.updatedAt == request.time
+        && (isUpdate ? data.createdAt == existing().createdAt : data.createdAt == request.time);
+    }
+
+    // --- Collections ---
+
+    // USERS
+    match /users/{userId} {
+      match /public/profile {
+        allow read: if isSignedIn();
+        allow create: if isOwner(userId) && isVerified() && isValidUserPublic(incoming());
+        allow update: if isOwner(userId) && isVerified() && isValidUserPublic(incoming()) && incoming().createdAt == existing().createdAt;
+      }
+      match /private/info {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isVerified() && isValidUserPrivate(incoming());
+        allow update: if isOwner(userId) && isVerified() && isValidUserPrivate(incoming()) && incoming().updatedAt == request.time;
+      }
+    }
+
+    // ZONES
+    match /zones/{zoneId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin(); // Only admins can modify zones
+
+      match /bays/{bayId} {
+        allow read: if isSignedIn();
+        // Users can potentially update bay status during booking (if atomic)
+        // Security can update status to 'occupied' when approving
+        allow update: if (
+          isAdmin() || 
+          (isVerified() && isValidBay(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) && (
+            (incoming().status == 'reserved' && existing().status == 'available') ||
+            (incoming().status == 'available' && existing().status == 'reserved') ||
+            (incoming().status == 'occupied' && existing().status == 'reserved' && isSecurity()) ||
+            (incoming().status == 'occupied' && existing().status == 'occupied') ||
+            (incoming().status == 'available' && existing().status == 'occupied')
+          ))
+        );
+      }
+    }
+
+    // ROLES
+    match /roles/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // BOOKINGS
+    match /bookings/{bookingId} {
+      allow get: if isOwner(existing().userId) || isSecurity();
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isSecurity());
+      
+      allow create: if isVerified() 
+        && isValidId(bookingId)
+        && isValidBooking(incoming(), false)
+        && incoming().userId == request.auth.uid
+        && exists(/databases/$(database)/documents/zones/$(incoming().zoneId))
+        && exists(/databases/$(database)/documents/zones/$(incoming().zoneId)/bays/$(incoming().bayId));
+
+      allow update: if (isOwner(existing().userId) || isSecurity())
+        && isVerified()
+        && isValidBooking(incoming(), true)
+        && incoming().userId == existing().userId
+        && (
+          // Action: Arrival Request
+          (isOwner(existing().userId) && incoming().status == 'PENDING_CHECKIN' && existing().status == 'pending' && incoming().diff(existing()).affectedKeys().hasAll(['status', 'arrivalTime', 'updatedAt'])) ||
+          // Action: Approval
+          (isSecurity() && incoming().status == 'APPROVED' && existing().status == 'PENDING_CHECKIN' && incoming().diff(existing()).affectedKeys().hasAll(['status', 'checkInTime', 'approvedBy', 'updatedAt'])) ||
+          // Action: Final Check-in
+          (isOwner(existing().userId) && incoming().status == 'confirmed' && existing().status == 'APPROVED' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+          // Action: Cancel/Check-out
+          (incoming().diff(existing()).affectedKeys().hasAll(['status', 'updatedAt']))
+        );
+      
+      allow delete: if isAdmin();
+    }
+  }
+}
