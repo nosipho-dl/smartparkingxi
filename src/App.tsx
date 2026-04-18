@@ -3,6 +3,7 @@ import {
   BookHeart, 
   CalendarCheck, 
   Car,
+  CheckCircle,
   ChevronLeft, 
   ChevronRight, 
   Clock, 
@@ -128,14 +129,14 @@ const Button = ({
   className?: string;
   disabled?: boolean;
 }) => {
-  const base = "px-6 py-3 rounded-lg font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2 text-xs uppercase tracking-wide";
+  const base = "px-6 py-3 rounded-lg font-bold transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2 text-[13px] font-display uppercase tracking-widest";
   const variants = {
-    primary: "bg-royal-blue text-white shadow-lg shadow-royal-blue/10",
-    secondary: "bg-dut-purple text-white shadow-lg shadow-dut-purple/10",
-    outline: "border border-royal-blue text-royal-blue bg-white",
-    ghost: "bg-baby-blue text-royal-blue",
-    danger: "bg-error text-white shadow-lg shadow-error/10",
-    success: "bg-success text-white shadow-lg shadow-success/10",
+    primary: "bg-teal-br text-bg shadow-lg shadow-teal-br/20",
+    secondary: "bg-teal-dim text-white border border-teal-mid/30",
+    outline: "border border-teal-br text-teal-br hover:bg-teal-br/10",
+    ghost: "bg-surface text-muted hover:text-white",
+    danger: "bg-error text-white shadow-lg shadow-error/20",
+    success: "bg-teal-br text-bg",
   };
 
   return (
@@ -160,31 +161,31 @@ const Header = ({
   onBack?: () => void;
   onNotify?: () => void;
 }) => (
-  <header className="px-6 py-4 flex items-center justify-between sticky top-0 bg-white z-30">
+  <header className="px-6 py-4 flex items-center justify-between sticky top-0 bg-surface border-b border-border z-30">
     <div className="flex items-center gap-3">
       {showBack && (
-        <button onClick={onBack} className="p-2 -ml-2 text-royal-blue hover:bg-slate-100 rounded-full">
+        <button onClick={onBack} className="p-2 -ml-2 text-teal-br hover:bg-raised rounded-lg">
           <ChevronLeft className="w-6 h-6" />
         </button>
       )}
-      <h1 className="text-base font-extrabold uppercase tracking-tight text-royal-blue">{title}</h1>
+      <h1 className="text-sm font-display uppercase tracking-[3px] text-white">{title}</h1>
     </div>
-    <button onClick={onNotify} className="p-2 bg-white soft-shadow rounded-full relative">
-      <Bell className="w-5 h-5 text-gray" />
-      <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border-2 border-white"></span>
+    <button onClick={onNotify} className="p-2 bg-card border border-border rounded-lg relative">
+      <Bell className="w-5 h-5 text-muted" />
+      <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-teal-br rounded-full border border-bg pulse-dot"></span>
     </button>
   </header>
 );
 
 const Badge = ({ status }: { status: Zone['status'] }) => {
   const configs = {
-    available: { label: 'Open', color: 'bg-success text-white' },
-    limited: { label: 'Limited', color: 'bg-warning text-dark' },
-    full: { label: 'Full', color: 'bg-error text-white' },
+    available: { label: 'Open', color: 'bg-teal-dim/20 text-teal-br border border-teal-br/30' },
+    limited: { label: 'Limited', color: 'bg-amber-500/20 text-amber-400 border border-amber-500/30' },
+    full: { label: 'Full', color: 'bg-error/20 text-error border border-error/30' },
   };
   const config = configs[status];
   return (
-    <span className={`px-2 py-1 rounded-full text-[9px] uppercase font-bold ${config.color}`}>
+    <span className={`px-2 py-0.5 rounded-md text-[8px] uppercase font-black tracking-widest ${config.color}`}>
       {config.label}
     </span>
   );
@@ -372,45 +373,52 @@ export default function App() {
   // --- Render Screens ---
 
   const renderLogin = () => (
-    <div className="min-h-screen bg-transparent flex flex-col justify-center px-8 py-12 text-dark">
+    <div className="min-h-screen bg-bg flex flex-col justify-center px-8 py-12 text-white">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="mb-12 text-center"
       >
-        <div className="w-[60px] h-[60px] bg-royal-blue rounded-[15px] mx-auto mb-[15px] flex items-center justify-center shadow-xl">
-          <BookHeart className="w-8 h-8 text-white" />
+        <div className="w-[64px] h-[64px] bg-teal-dim rounded-[18px] mx-auto mb-[20px] flex items-center justify-center shadow-2xl border border-teal-br/20">
+          <BookHeart className="w-8 h-8 text-teal-br" />
         </div>
-        <h2 className="text-[18px] font-extrabold text-royal-blue tracking-tight">Welcome</h2>
-        <p className="text-[12px] text-gray mt-1">Sign in to your campus account</p>
+        <h2 className="text-[32px] font-display text-white uppercase tracking-tighter">
+          SCRATCH <span className="text-teal-br">XI</span>
+        </h2>
+        <p className="text-[10px] text-muted font-sans uppercase tracking-[2px] mt-2">Smart Campus Parking System</p>
       </motion.div>
 
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
-        className="space-y-4 max-w-xs mx-auto w-full"
+        className="space-y-6 max-w-xs mx-auto w-full"
       >
-        <div className="space-y-3">
-          <input 
-            type="email" 
-            placeholder="Student Email" 
-            className="w-full bg-slate-100 rounded-lg px-4 py-3 text-sm focus:bg-white border-transparent focus:border-royal-blue/30 border transition-all outline-hidden"
-          />
-          <input 
-            type="password" 
-            placeholder="Password" 
-            className="w-full bg-slate-100 rounded-lg px-4 py-3 text-sm focus:bg-white border-transparent focus:border-royal-blue/30 border transition-all outline-hidden"
-          />
+        <div className="space-y-4">
+          <div className="relative">
+             <input 
+              type="email" 
+              placeholder="Student ID / Email" 
+              className="w-full bg-surface border border-border rounded-[10px] px-5 py-4 text-sm focus:border-teal-br/50 border transition-all outline-hidden text-white placeholder:text-dim"
+            />
+          </div>
+          <div className="relative">
+             <input 
+              type="password" 
+              placeholder="Password" 
+              className="w-full bg-surface border border-border rounded-[10px] px-5 py-4 text-sm focus:border-teal-br/50 border transition-all outline-hidden text-white placeholder:text-dim"
+            />
+          </div>
         </div>
         
-        <Button onClick={handleLogin} className="w-full mt-4 !rounded-lg py-4">
-          Login
+        <Button onClick={handleLogin} className="w-full mt-2 !rounded-[12px] py-5 shadow-2xl">
+          Enter Console
         </Button>
         
-        <p className="text-center text-[11px] font-bold text-royal-blue pt-4 cursor-pointer">
-          Create Account
-        </p>
+        <div className="flex justify-between items-center text-[10px] font-bold text-muted uppercase tracking-widest px-1">
+          <span className="cursor-pointer hover:text-teal-br transition-colors">Forgot Access</span>
+          <span onClick={handleLogin} className="cursor-pointer hover:text-teal-br transition-colors">Guest Entry</span>
+        </div>
       </motion.div>
     </div>
   );
@@ -420,169 +428,229 @@ export default function App() {
     const isPenaltyActive = isBlockedUntil && isBlockedUntil > Date.now();
 
     return (
-      <div className="pb-24">
-        <Header title="ScratchXI Smart Parking" onNotify={() => navigateTo('notifications')} />
+      <div className="pb-24 bg-bg">
+        <Header title="Smart Dashboard" onNotify={() => navigateTo('notifications')} />
         
-        <main className="px-6 py-4 space-y-8">
-          <section>
-            <p className="text-[11px] font-bold text-gray uppercase tracking-widest">Hi, Alex Henderson</p>
+        <main className="px-6 py-6 space-y-8">
+          <section className="flex justify-between items-end">
+             <div className="space-y-1">
+                <p className="text-[9px] font-sans font-bold text-dim uppercase tracking-[3px]">Authorized Operator</p>
+                <h3 className="text-xl font-display text-white">Alex Henderson</h3>
+             </div>
+             <div className="w-11 h-11 bg-surface border border-border rounded-xl flex items-center justify-center">
+                <User className="w-5 h-5 text-teal-br" />
+             </div>
           </section>
 
           {isPenaltyActive && (
             <motion.section 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="p-4 bg-error/10 border border-error/20 rounded-xl flex items-center gap-3"
+              className="p-5 bg-error/10 border border-error/30 rounded-2xl flex items-center gap-4"
             >
-              <Info className="w-6 h-6 text-error" />
+              <div className="w-10 h-10 bg-error/20 rounded-xl flex items-center justify-center shrink-0">
+                 <Info className="w-5 h-5 text-error" />
+              </div>
               <div className="flex-1">
-                 <h4 className="font-bold text-error text-xs uppercase">Booking Restricted</h4>
-                 <p className="text-[10px] text-error/80">You are blocked until tomorrow for a previous overstay.</p>
+                 <h4 className="font-display text-error text-[12px] uppercase tracking-wider">Breach Detected</h4>
+                 <p className="text-[10px] text-error/60 font-sans">Overstay penalty active. Next window in 24h.</p>
               </div>
             </motion.section>
           )}
 
-          <section className="themed-card !border-royal-blue">
-            <p className="text-[11px] font-bold text-gray uppercase mb-3 text-center">Live Campus Status</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-dut-purple-light p-3 rounded-xl text-center">
-                <span className="block text-[10px] text-dut-purple uppercase font-bold mb-1">Available Spots</span>
-                <strong className="text-2xl text-dut-purple">{availableTotal}</strong>
-              </div>
-              <div className="bg-dut-purple-light p-3 rounded-xl text-center">
-                <span className="block text-[10px] text-dut-purple uppercase font-bold mb-1">Active Booking</span>
-                <strong className="text-2xl text-dut-purple">{activeBooking ? '1' : '0'}</strong>
-              </div>
-            </div>
+          {/* Environmental Sensors Section */}
+          <div className="grid grid-cols-2 gap-3">
+             <div className="bg-surface border border-border p-5 rounded-3xl space-y-4">
+                <div className="flex justify-between items-start">
+                   <div className="w-8 h-8 bg-raised border border-border rounded-lg flex items-center justify-center">
+                      <Zap className="w-4 h-4 text-teal-br" />
+                   </div>
+                   <div className="w-2 h-2 rounded-full pulse-dot"></div>
+                </div>
+                <div>
+                   <p className="text-[20px] font-display text-white">{availableTotal}</p>
+                   <p className="text-[8px] font-bold text-muted uppercase tracking-widest">Available Spots</p>
+                </div>
+             </div>
+             
+             <button onClick={() => navigateTo('notifications')} className="bg-surface border border-border p-5 rounded-3xl space-y-4 text-left">
+                <div className="flex justify-between items-start">
+                   <div className="w-8 h-8 bg-raised border border-border rounded-lg flex items-center justify-center">
+                      <Bell className="w-4 h-4 text-muted" />
+                   </div>
+                </div>
+                <div>
+                   <p className="text-[20px] font-display text-white">3</p>
+                   <p className="text-[8px] font-bold text-muted uppercase tracking-widest">Active Alerts</p>
+                </div>
+             </button>
+          </div>
+
+          {/* Core Controls */}
+          <section className="space-y-4">
+             <div className="flex justify-between items-center px-1">
+                <h4 className="text-[10px] font-display text-white uppercase tracking-[3px]">Console Ops</h4>
+                <div className="w-6 h-px bg-border"></div>
+             </div>
+             
+             <button 
+                onClick={() => !isPenaltyActive && navigateTo('zones')}
+                disabled={isPenaltyActive}
+                className={`w-full group relative overflow-hidden bg-card border border-border rounded-[20px] p-6 flex flex-col gap-5 transition-all active:scale-[0.97] ${isPenaltyActive ? 'opacity-40 grayscale pointer-events-none' : 'hover:border-teal-dim'}`}
+             >
+                <div className="flex justify-between items-start w-full relative z-10">
+                   <div className="w-12 h-12 bg-raised border border-border rounded-xl flex items-center justify-center">
+                      <Navigation className="w-6 h-6 text-teal-br" />
+                   </div>
+                   <div className="h-6 w-11 bg-raised border border-border rounded-full p-1 flex items-center">
+                      <div className="w-4 h-4 bg-teal-br rounded-full shadow-[0_0_8px_rgba(0,0,13,0.5)]"></div>
+                   </div>
+                </div>
+                <div className="text-left relative z-10">
+                   <p className="text-[12px] font-bold text-white mb-0.5">Initialize Parking Search</p>
+                   <p className="text-[10px] text-muted font-sans font-light">Locate and reserve bay in neural map</p>
+                </div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-teal-br/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-teal-br/10 transition-all"></div>
+             </button>
           </section>
 
           {activeBooking && (
-            <section className="space-y-3">
-              <h3 className="font-bold text-sm text-dark">Current Appointment</h3>
-              <motion.div 
-                whileTap={{ scale: 0.98 }}
+            <motion.section 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="space-y-4"
+            >
+              <h4 className="text-[10px] font-display text-white uppercase tracking-[3px]">Active Comm</h4>
+              <div 
                 onClick={() => navigateTo('active')}
-                className="themed-card !border-success !bg-baby-blue flex flex-col gap-2 cursor-pointer"
+                className="bg-card border-2 border-teal-dim rounded-3xl p-6 relative overflow-hidden cursor-pointer"
               >
-                <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-xs">{activeBooking.zoneName} - Bay {activeBooking.bayLabel}</h3>
-                  <Badge status={activeBooking.status === 'pending' ? 'limited' : 'available'} />
+                <div className="relative z-10 flex justify-between items-center">
+                   <div className="space-y-5">
+                      <div>
+                        <h4 className="text-lg font-display text-white">{activeBooking.zoneName}</h4>
+                        <div className="flex items-center gap-2">
+                           <div className="w-1.5 h-1.5 rounded-full bg-teal-br pulse-dot"></div>
+                           <p className="text-[9px] text-teal-br font-bold uppercase tracking-[2px]">Bay {activeBooking.bayLabel}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-6">
+                         <div>
+                            <p className="text-[7px] font-bold text-dim uppercase tracking-wider mb-0.5">Duration</p>
+                            <p className="text-[11px] font-display text-white">{activeBooking.durationHours}h</p>
+                         </div>
+                         <div>
+                            <p className="text-[7px] font-bold text-dim uppercase tracking-wider mb-0.5">Expiry</p>
+                            <p className="text-[11px] font-display text-teal-br">
+                               {new Date(activeBooking.expiryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                         </div>
+                      </div>
+                   </div>
+                   <div className="w-20 h-20 relative flex items-center justify-center">
+                      <svg className="w-full h-full transform -rotate-90">
+                         <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-raised" />
+                         <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="4" fill="transparent" strokeDasharray="201" strokeDashoffset={201 - (201 * (timeLeft / (activeBooking.durationHours * 3600)))} strokeLinecap="round" className="text-teal-br transition-all duration-1000" />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                         <span className="text-[11px] font-display text-white leading-none">{formatTime(timeLeft)}</span>
+                      </div>
+                   </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <p className="text-[10px] text-dark/70">
-                    {activeBooking.status === 'pending' ? `Arrive in ${formatTime(timeLeft)}` : `Duration: ${activeBooking.durationHours}h • Ends ${new Date(activeBooking.expiryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
-                  </p>
-                  <ChevronRight className="w-4 h-4 text-gray" />
-                </div>
-              </motion.div>
-            </section>
+              </div>
+            </motion.section>
           )}
-
-          <Button 
-            variant="primary" 
-            className="w-full !rounded-xl py-4 shadow-xl" 
-            onClick={() => navigateTo('zones')}
-            disabled={!!isPenaltyActive}
-          >
-            Start New Booking
-          </Button>
-
-          <section className="space-y-4">
-            <h3 className="font-bold text-lg">Quick Actions</h3>
-            <div className="grid grid-cols-2 gap-3">
-               <button onClick={() => navigateTo('feedback')} className="p-4 bg-white soft-shadow rounded-2xl flex flex-col items-center gap-2">
-                  <MessageSquare className="w-6 h-6 text-dut-purple" />
-                  <span className="text-[10px] font-bold uppercase">Feedback</span>
-               </button>
-               <button onClick={() => navigateTo('notifications')} className="p-4 bg-white soft-shadow rounded-2xl flex flex-col items-center gap-2">
-                  <Bell className="w-6 h-6 text-royal-blue" />
-                  <span className="text-[10px] font-bold uppercase">Alerts</span>
-               </button>
-            </div>
-          </section>
         </main>
   
-        <nav className="fixed bottom-6 left-6 right-6 bg-white/80 backdrop-blur-xl border border-white soft-shadow rounded-3xl px-6 py-4 flex items-center justify-between z-40">
-          <button onClick={() => navigateTo('home')} className={`p-2 rounded-xl transition-colors ${screen === 'home' ? 'text-royal-blue bg-royal-blue/10' : 'text-slate-400 hover:text-royal-blue'}`}>
-            <LayoutDashboard className="w-6 h-6" />
-          </button>
-          <button onClick={() => navigateTo('zones')} className={`p-2 rounded-xl transition-colors ${screen === 'zones' ? 'text-royal-blue bg-royal-blue/10' : 'text-slate-400 hover:text-royal-blue'}`}>
-            <MapIcon className="w-6 h-6" />
-          </button>
-          <button 
-            onClick={() => navigateTo('zones')}
-            className={`p-4 bg-royal-blue rounded-2xl -mt-12 shadow-xl shadow-royal-blue/30 text-white ${isPenaltyActive ? 'opacity-50 grayscale' : ''}`}
-            disabled={!!isPenaltyActive}
-          >
-            <Navigation className="w-7 h-7" />
-          </button>
-          <button onClick={() => navigateTo('active')} className={`p-2 rounded-xl transition-colors ${screen === 'active' ? 'text-royal-blue bg-royal-blue/10' : 'text-slate-400 hover:text-royal-blue'}`}>
-            <CalendarCheck className="w-6 h-6" />
-          </button>
-          <button onClick={() => navigateTo('profile')} className={`p-2 rounded-xl transition-colors ${screen === 'profile' ? 'text-royal-blue bg-royal-blue/10' : 'text-slate-400 hover:text-royal-blue'}`}>
-            <User className="w-6 h-6" />
-          </button>
+        <nav className="fixed bottom-6 left-6 right-6 bg-surface border border-border rounded-[24px] px-6 py-3 flex items-center justify-between z-40 shadow-2xl">
+          {[
+            { s: 'home' as Screen, i: LayoutDashboard },
+            { s: 'zones' as Screen, i: MapIcon },
+            { s: 'active' as Screen, i: CalendarCheck },
+            { s: 'profile' as Screen, i: User }
+          ].map(tab => (
+            <button 
+               key={tab.s}
+               onClick={() => navigateTo(tab.s)} 
+               className={`p-3 rounded-xl transition-all ${screen === tab.s ? 'bg-teal-br text-bg shadow-lg shadow-teal-br/20 scale-110' : 'text-muted hover:text-white'}`}
+            >
+              <tab.i className={`w-5 h-5 ${screen === tab.s ? 'stroke-3' : 'stroke-2'}`} />
+            </button>
+          ))}
         </nav>
       </div>
     );
   };
+;
 
   const renderParkingZones = () => (
-    <div className="pb-24">
-      <Header title="Parking Zones" showBack onBack={goBack} onNotify={() => navigateTo('notifications')} />
+    <div className="pb-24 bg-bg">
+      <Header title="Neural Map" showBack onBack={goBack} onNotify={() => navigateTo('notifications')} />
       
-      <div className="px-6 py-4 space-y-4">
+      <main className="px-6 py-6 space-y-6">
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-dim w-4 h-4" />
           <input 
             type="text" 
-            placeholder="Search zones or campus..." 
-            className="w-full bg-white soft-shadow rounded-2xl pl-12 pr-4 py-4 outline-hidden focus:ring-2 focus:ring-royal-blue/20 transition-all"
+            placeholder="Search zones..." 
+            className="w-full bg-card border border-border rounded-xl pl-11 pr-4 py-4 text-xs font-sans outline-hidden focus:border-teal-br/50 transition-all text-white placeholder:text-dim"
           />
         </div>
 
-        <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar">
+        <div className="flex gap-3 pb-2 overflow-x-auto scrollbar-hide">
           {['All', 'Riverside', 'Indumiso', 'Steve Biko', 'Ritson', 'ML Sultan'].map(tag => (
-            <button key={tag} className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${tag === 'All' ? 'bg-royal-blue text-white' : 'bg-white soft-shadow text-slate-500'}`}>
+            <button 
+              key={tag} 
+              className={`px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap
+                ${tag === 'All' ? 'bg-teal-br text-bg shadow-md' : 'bg-surface border border-border text-muted'}
+              `}
+            >
               {tag}
             </button>
           ))}
         </div>
 
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3">
           {zones.map(zone => (
             <motion.div 
               layoutId={zone.id}
               key={zone.id} 
-              className="bg-white p-3 border-b border-slate-100 flex items-center justify-between group active:bg-slate-50 transition-colors"
+              className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-4 relative overflow-hidden transition-all hover:border-teal-dim active:bg-raised"
               onClick={() => handleReserve(zone)}
             >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-bold text-xs">{zone.name}</h4>
-                  <span className="text-[8px] px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded-full font-bold uppercase">{zone.campus}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={false}
-                      animate={{ width: `${(zone.used / zone.capacity) * 100}%` }}
-                      className={`h-full ${zone.status === 'full' ? 'bg-error' : zone.status === 'limited' ? 'bg-warning' : 'bg-success'}`}
-                    />
+              <div className="flex justify-between items-start relative z-10">
+                <div className="space-y-1">
+                  <h4 className="text-[14px] font-display text-white">{zone.name}</h4>
+                  <div className="flex items-center gap-2 text-[9px] font-bold text-muted uppercase tracking-widest">
+                     <MapPin className="w-3 h-3 text-teal-br" />
+                     {zone.campus} Terminal
                   </div>
-                  <p className="text-[10px] text-gray uppercase font-medium">
-                    {zone.status === 'full' ? 'Zone is full' : `${zone.capacity - zone.used} spaces`}
-                  </p>
                 </div>
-              </div>
-              <div className="flex flex-col items-end gap-1">
                 <Badge status={zone.status} />
-                <span className="text-[8px] font-bold text-gray uppercase">{zone.type}</span>
               </div>
+
+              <div className="flex justify-between items-end relative z-10">
+                <div className="flex-1 space-y-2 max-w-[140px]">
+                   <div className="w-full h-1 bg-raised rounded-full overflow-hidden">
+                     <motion.div 
+                        initial={false}
+                        animate={{ width: `${(zone.used / zone.capacity) * 100}%` }}
+                        className={`h-full ${zone.status === 'full' ? 'bg-error' : 'bg-teal-br'}`}
+                     />
+                   </div>
+                   <p className="text-[8px] font-black text-dim uppercase tracking-tighter italic">
+                     {zone.status === 'full' ? 'Capacity compromised' : `Node status: ${zone.capacity - zone.used} free units`}
+                   </p>
+                </div>
+                <p className="text-[12px] font-display text-white leading-none">
+                   {zone.distance}
+                </p>
+              </div>
+              <div className="absolute top-0 right-0 w-24 h-24 bg-teal-br/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
             </motion.div>
           ))}
         </div>
-      </div>
+      </main>
     </div>
   );
 
@@ -598,58 +666,54 @@ export default function App() {
     const rows = Object.keys(baysByRow).sort();
 
     return (
-      <div className="min-h-screen pb-24 bg-slate-50">
-        <Header title="Select Parking Bay" showBack onBack={goBack} />
+      <div className="min-h-screen pb-24 bg-bg">
+        <Header title="Neural Grid" showBack onBack={goBack} />
         
-        <main className="px-6 py-4 flex flex-col gap-6">
+        <main className="px-6 py-6 flex flex-col gap-8">
           {/* Legend Section */}
-          <div className="bg-white p-4 rounded-3xl soft-shadow border border-slate-100 grid grid-cols-2 gap-y-3 gap-x-6">
+          <section className="bg-surface border border-border p-5 rounded-3xl grid grid-cols-2 gap-y-4 gap-x-8">
              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-lg bg-success/10 flex items-center justify-center border border-success/20">
-                   <div className="w-3 h-3 bg-success rounded-sm"></div>
+                <div className="w-5 h-5 rounded-md bg-teal-br/10 border border-teal-br/20 flex items-center justify-center">
+                   <div className="w-2.5 h-2.5 bg-teal-br rounded-sm"></div>
                 </div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Available</span>
+                <span className="text-[9px] font-black text-white/50 uppercase tracking-widest">Available</span>
              </div>
              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-lg bg-error/10 flex items-center justify-center border border-error/20">
-                   <div className="w-5 h-5 text-error">
+                <div className="w-5 h-5 rounded-md bg-error/10 border border-error/20 flex items-center justify-center">
+                   <div className="w-4 h-4 text-error">
                       <Car className="w-full h-full" />
                    </div>
                 </div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Occupied</span>
+                <span className="text-[9px] font-black text-white/50 uppercase tracking-widest">Occupied</span>
              </div>
              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-lg bg-dut-purple/10 flex items-center justify-center border border-dut-purple/20">
-                   <div className="w-3 h-3 bg-dut-purple rounded-sm"></div>
+                <div className="w-5 h-5 rounded-md bg-white/5 border border-white/10 flex items-center justify-center">
+                   <div className="w-2.5 h-2.5 bg-muted rounded-sm"></div>
                 </div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Reserved</span>
+                <span className="text-[9px] font-black text-white/50 uppercase tracking-widest">Reserved</span>
              </div>
              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-lg bg-royal-blue/10 flex items-center justify-center border border-royal-blue/20">
-                   <div className="w-4 h-4 text-royal-blue">
-                      <ParkingCircle className="w-full h-full" />
-                   </div>
+                <div className="w-5 h-5 rounded-md bg-teal-br flex items-center justify-center shadow-[0_0_12px_rgba(0,132,13,0.3)]">
+                   <ParkingCircle className="w-4 h-4 text-bg" />
                 </div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Selected</span>
+                <span className="text-[9px] font-black text-teal-br uppercase tracking-widest">Selected</span>
              </div>
-          </div>
+          </section>
 
           {/* Map/Grid Section */}
-          <div className="bg-white soft-shadow rounded-[40px] border border-slate-100 p-6 space-y-8 overflow-y-auto max-h-[500px] scrollbar-hide shadow-inner bg-[radial-gradient(#f1f5f9_1px,transparent_1px)] [background-size:20px_20px]">
+          <div className="bg-surface border border-border rounded-[40px] p-6 space-y-12 overflow-y-auto max-h-[500px] scrollbar-hide">
             {rows.map((rowName, idx) => (
               <div key={rowName} className="relative">
                 {/* Visual "Lane" Indicator after rows (except last) */}
                 {idx > 0 && (
-                   <div className="h-10 mb-8 flex items-center justify-center border-y border-dashed border-slate-200">
-                      <span className="text-[9px] font-bold text-slate-300 uppercase tracking-[0.5em]">Driving Lane</span>
-                   </div>
+                   <div className="absolute inset-x-0 -top-8 h-px bg-linear-to-r from-transparent via-border to-transparent"></div>
                 )}
                 
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-5">
                   {/* Row Label */}
-                  <div className="w-8 flex flex-col items-center justify-center pt-2">
-                     <span className="text-[10px] font-black text-slate-300 uppercase">Row</span>
-                     <span className="text-2xl font-black text-royal-blue">{rowName}</span>
+                  <div className="w-[44px] flex flex-col items-center justify-center py-4 bg-raised border border-border rounded-xl shrink-0">
+                     <span className="text-[8px] font-bold text-dim uppercase tracking-widest mb-1 leading-none">Row</span>
+                     <span className="text-xl font-display text-teal-br leading-none">{rowName}</span>
                   </div>
 
                   {/* Bay Items */}
@@ -659,40 +723,35 @@ export default function App() {
                         key={bay.id}
                         whileTap={{ scale: 0.9 }}
                         whileHover={{ scale: 1.05 }}
-                        animate={selectedBay?.id === bay.id ? { y: -4, scale: 1.05 } : { y: 0, scale: 1 }}
+                        animate={selectedBay?.id === bay.id ? { y: -8, scale: 1.1 } : { y: 0, scale: 1 }}
                         onClick={() => selectBay(bay)}
-                        className={`relative w-full aspect-[3/4] rounded-xl flex flex-col items-center justify-between p-2 pb-1 border-2 transition-all overflow-hidden
-                          ${bay.status === 'occupied' ? 'bg-slate-50 border-slate-100 grayscale opacity-80' : 
-                            bay.status === 'reserved' ? 'bg-dut-purple/5 border-dut-purple/20' : 
-                            selectedBay?.id === bay.id ? 'bg-royal-blue border-royal-blue shadow-lg shadow-royal-blue/20' : 
-                            'bg-white border-success/20 hover:border-success/40'}
+                        className={`relative w-full aspect-[3/4.5] rounded-xl flex flex-col items-center justify-between p-2 pb-1.5 border-2 transition-all overflow-hidden
+                          ${bay.status === 'occupied' ? 'bg-bg/20 border-border opacity-30 grayscale' : 
+                            bay.status === 'reserved' ? 'bg-card border-border/10' : 
+                            selectedBay?.id === bay.id ? 'bg-teal-br border-teal-br shadow-[0_0_20px_rgba(0,201,141,0.2)]' : 
+                            'bg-card border-border hover:border-teal-dim'}
                         `}
                       >
                         {/* Bay ID Label */}
-                        <span className={`text-[9px] font-black ${selectedBay?.id === bay.id ? 'text-white/60' : 'text-slate-300'}`}>
+                        <span className={`text-[8px] font-bold ${selectedBay?.id === bay.id ? 'text-bg/60' : 'text-dim'}`}>
                            {bay.label}
                         </span>
 
                         {/* Centered Icon */}
                         <div className="flex-1 flex items-center justify-center w-full">
                            {bay.status === 'occupied' ? (
-                              <Car className="w-8 h-8 text-error/40" />
+                              <Car className="w-8 h-8 text-white/10" />
                            ) : bay.status === 'reserved' ? (
-                              <div className="w-2.5 h-2.5 bg-dut-purple rounded-full animate-pulse"></div>
+                              <div className="w-1.5 h-1.5 bg-muted rounded-full animate-pulse"></div>
                            ) : selectedBay?.id === bay.id ? (
-                              <ParkingCircle className="w-8 h-8 text-white" />
+                              <ParkingCircle className="w-9 h-9 text-bg" />
                            ) : (
-                              <div className="w-1.5 h-full border-x border-slate-50"></div>
+                              <div className="w-[2px] h-[70%] bg-border/20 rounded-full"></div>
                            )}
                         </div>
 
                         {/* Bottom Status Dot */}
-                        <div className={`w-full h-1 rounded-full ${bay.status === 'occupied' ? 'bg-error' : bay.status === 'reserved' ? 'bg-dut-purple' : selectedBay?.id === bay.id ? 'bg-white' : 'bg-success'}`}></div>
-
-                        {/* Background subtle gradient for visual depth */}
-                        {selectedBay?.id === bay.id && (
-                           <div className="absolute inset-0 bg-linear-to-tr from-royal-blue to-royal-blue/80 pointer-events-none -z-10"></div>
-                        )}
+                        <div className={`w-full h-1 rounded-full ${bay.status === 'occupied' ? 'bg-error' : bay.status === 'reserved' ? 'bg-muted' : selectedBay?.id === bay.id ? 'bg-bg' : 'bg-teal-br/20'}`}></div>
                       </motion.button>
                     ))}
                   </div>
@@ -701,26 +760,23 @@ export default function App() {
             ))}
           </div>
 
-          {/* Confirm/Select Drawer (Floats when selection made) */}
+          {/* Confirm/Select Drawer */}
           <AnimatePresence>
             {selectedBay && (
                 <motion.div 
                    initial={{ y: 50, opacity: 0 }}
                    animate={{ y: 0, opacity: 1 }}
                    exit={{ y: 50, opacity: 0 }}
-                   className="themed-card !border-royal-blue flex items-center justify-between p-6 m-0 z-50 sticky bottom-4 shadow-2xl"
+                   className="bg-surface border border-teal-br rounded-[32px] flex items-center justify-between p-6 m-0 z-50 sticky bottom-4 shadow-2xl"
                 >
                    <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                         <div className="w-5 h-5 bg-royal-blue/10 rounded-md flex items-center justify-center">
-                            <ParkingCircle className="w-3.5 h-3.5 text-royal-blue" />
-                         </div>
-                         <h4 className="font-black text-royal-blue text-lg">Bay {selectedBay.label}</h4>
+                         <h4 className="font-display text-white text-lg">Unit {selectedBay.label}</h4>
                       </div>
-                      <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Confirmed Available</p>
+                      <p className="text-[10px] text-teal-br uppercase font-black tracking-widest">Active Link Detected</p>
                    </div>
-                   <Button variant="primary" className="!rounded-2xl px-8 py-4 text-sm font-bold shadow-lg shadow-royal-blue/30" onClick={proceedToDuration}>
-                      Reserve Now
+                   <Button onClick={proceedToDuration} className="shadow-[0_0_20px_rgba(0,201,141,0.4)]">
+                      Connect
                    </Button>
                 </motion.div>
             )}
@@ -731,46 +787,53 @@ export default function App() {
   };
 
   const renderDurationSelect = () => (
-    <div className="min-h-screen pb-24">
-      <Header title="Set Duration" showBack onBack={goBack} />
-      <main className="px-6 py-4 space-y-8">
-        <div className="text-center space-y-2">
-            <h3 className="text-2xl font-extrabold text-royal-blue">How long will you stay?</h3>
-            <p className="text-gray text-sm italic">Accurate timing helps campus management.</p>
+    <div className="min-h-screen pb-24 bg-bg">
+      <Header title="Session Timer" showBack onBack={goBack} />
+      <main className="px-6 py-8 space-y-12">
+        <div className="space-y-2">
+            <h3 className="text-2xl font-display text-white">Define Session</h3>
+            <p className="text-muted text-sm font-sans">Initialize access window duration.</p>
         </div>
 
         <div className="grid grid-cols-1 gap-4">
            {[
-              { h: 1, label: 'Short Stay', range: '1 Hour', color: 'bg-baby-blue' },
-              { h: 4, label: 'Medium Stay', range: '2 - 4 Hours', color: 'bg-dut-purple-light' },
-              { h: 8, label: 'Long Stay', range: '5 - 8 Hours', color: 'bg-slate-100' }
+              { h: 1, label: 'Standard Protocol', range: '1.0 Hour', desc: 'Short-term diagnostic stay' },
+              { h: 4, label: 'Extended Logic', range: '4.0 Hours', desc: 'Medium-term research window' },
+              { h: 8, label: 'Full Shift Cycle', range: '8.0 Hours', desc: 'Maximum operational limit' }
            ].map(opt => (
               <button 
                 key={opt.h}
                 onClick={() => setSelectedDurationHours(opt.h)}
-                className={`p-6 rounded-3xl border-2 text-left transition-all relative overflow-hidden
-                  ${selectedDurationHours === opt.h ? 'border-royal-blue ring-4 ring-royal-blue/10 scale-[1.02]' : 'border-transparent bg-white soft-shadow'}
+                className={`p-6 rounded-[24px] border-2 text-left transition-all relative overflow-hidden group
+                  ${selectedDurationHours === opt.h ? 'bg-card border-teal-br' : 'bg-surface border-border'}
                 `}
               >
                 <div className="flex justify-between items-center relative z-10">
-                   <div>
-                      <h4 className="font-bold text-dark">{opt.label}</h4>
-                      <p className="font-extrabold text-royal-blue text-xl">{opt.range}</p>
+                   <div className="space-y-1">
+                      <p className={`text-[10px] font-black uppercase tracking-widest ${selectedDurationHours === opt.h ? 'text-teal-br' : 'text-dim'}`}>
+                         {opt.label}
+                      </p>
+                      <h4 className="font-display text-white text-xl">{opt.range}</h4>
+                      <p className="text-[10px] text-muted">{opt.desc}</p>
                    </div>
-                   <Clock className={`w-10 h-10 ${selectedDurationHours === opt.h ? 'text-royal-blue' : 'text-slate-200'}`} />
+                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-all ${selectedDurationHours === opt.h ? 'bg-teal-br/10 border-teal-br/30' : 'bg-raised border-border'}`}>
+                      <Clock className={`w-7 h-7 ${selectedDurationHours === opt.h ? 'text-teal-br' : 'text-muted'}`} />
+                   </div>
                 </div>
+                {selectedDurationHours === opt.h && (
+                   <div className="absolute top-0 right-0 w-24 h-24 bg-teal-br/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
+                )}
               </button>
            ))}
         </div>
 
-        <div className="fixed bottom-32 left-6 right-6">
+        <div className="pt-8">
            <Button 
-                variant="primary" 
-                className="w-full !rounded-2xl py-5 shadow-2xl" 
+                className="w-full shadow-[0_0_30px_rgba(0,201,141,0.3)]" 
                 disabled={!selectedDurationHours}
                 onClick={confirmReservation}
            >
-              Confirm Reservation Details
+              Initialize Node Sync
            </Button>
         </div>
       </main>
@@ -778,112 +841,137 @@ export default function App() {
   );
 
   const renderConfirm = () => (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-slate-50 text-center">
+    <div className="min-h-screen flex flex-col items-center justify-center px-10 bg-bg text-center space-y-10">
       <motion.div 
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="w-24 h-24 bg-success/10 text-success rounded-full flex items-center justify-center mb-8"
+        className="w-24 h-24 bg-teal-br/10 border border-teal-br/30 rounded-[32px] flex items-center justify-center relative shadow-[0_0_40px_rgba(0,201,141,0.2)]"
       >
-        <CalendarCheck className="w-12 h-12" />
+        <CheckCircle className="w-12 h-12 text-teal-br" />
+        <div className="absolute inset-0 rounded-[32px] border-2 border-teal-br animate-ping opacity-20"></div>
       </motion.div>
-      <h2 className="text-3xl font-bold font-display text-royal-blue mb-2 text-center">Parking Reserved!</h2>
 
-      <p className="text-slate-500 mb-8 max-w-xs mx-auto">
-        Your spot at <span className="font-bold text-royal-blue">{selectedZone?.name}</span> is held for you.
-      </p>
-
-      <div className="bg-white soft-shadow rounded-3xl p-8 w-full space-y-6 border border-slate-100 max-w-sm">
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Arrive Within</p>
-          <div className="text-5xl font-bold text-royal-blue font-display">
-            {formatTime(timeLeft)}
-          </div>
-        </div>
-        
-        <div className="pt-6 border-t border-slate-50 space-y-3">
-          <Button variant="primary" className="w-full" onClick={() => navigateTo('active')}>
-            Manage Booking
-          </Button>
-          <Button variant="ghost" className="w-full" onClick={cancelBooking}>
-            Cancel Reservation
-          </Button>
-        </div>
+      <div className="space-y-4">
+        <h2 className="text-3xl font-display text-white">SYNC <span className="text-teal-br text-[24px]">COMPLETE</span></h2>
+        <p className="text-muted text-sm font-sans max-w-[240px] mx-auto leading-relaxed">
+           Reservation finalized at <span className="text-white font-bold">{selectedZone?.name}</span>. Network confirmed for bay <span className="text-teal-br font-bold">{selectedBay?.label}</span>.
+        </p>
       </div>
+
+      <div className="bg-surface border border-border p-6 rounded-[28px] w-full space-y-4">
+         <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-widest text-dim px-2">
+            <span>Terminal Security Code</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-teal-br pulse-dot"></div>
+         </div>
+         <div className="bg-raised border border-border rounded-2xl py-6 flex flex-col items-center gap-2">
+            <span className="text-4xl font-display text-white tracking-[8px]">XI-904</span>
+            <span className="text-[10px] font-sans text-muted">15 MINUTE ARRIVAL WINDOW</span>
+         </div>
+      </div>
+
+      <Button onClick={() => navigateTo('home')} className="w-full">
+        Home Control
+      </Button>
     </div>
   );
 
   const renderActive = () => (
-    <div className="pb-24">
-      <Header title="Smart Ticket" showBack onBack={goBack} />
+    <div className="pb-24 bg-bg">
+      <Header title="Neural Link" showBack onBack={goBack} />
       
-      <main className="px-6 py-4 space-y-6">
+      <main className="px-6 py-6 space-y-8">
         {!activeBooking ? (
-          <div className="py-20 text-center space-y-4">
-            <div className="w-20 h-20 bg-slate-100 rounded-full mx-auto flex items-center justify-center text-slate-300">
+          <div className="py-20 text-center space-y-6">
+            <div className="w-20 h-20 bg-surface border border-border rounded-full mx-auto flex items-center justify-center text-dim">
               <CalendarCheck className="w-10 h-10" />
             </div>
-            <p className="text-slate-400 font-medium">No active bookings found.</p>
-            <Button variant="outline" onClick={() => navigateTo('zones')}>Book a Spot</Button>
+            <div className="space-y-2">
+               <h3 className="text-white font-display text-lg">No Active Nodes</h3>
+               <p className="text-muted text-xs font-sans">Initialize a booking to see ticket.</p>
+            </div>
+            <Button onClick={() => navigateTo('zones')}>Open Neural Map</Button>
           </div>
         ) : (
           <>
-            <div className="bg-white rounded-[40px] soft-shadow border border-slate-100 text-center relative overflow-hidden">
-               <div className="bg-royal-blue p-6 text-white space-y-2">
-                  <h4 className="text-[10px] uppercase font-bold tracking-[0.3em] opacity-60">Digital Parking Ticket</h4>
-                   <h2 className="text-2xl font-bold">{activeBooking.zoneName}</h2>
-                   <p className="text-sm opacity-80">Bay {activeBooking.bayLabel} • {activeBooking.durationHours}h Session</p>
+            <div className="bg-card rounded-[40px] border border-border text-center relative overflow-hidden shadow-2xl">
+               <div className="bg-teal-br p-8 text-bg space-y-2">
+                   <h4 className="text-[10px] uppercase font-black tracking-[0.4em] opacity-40 italic">Active Operational Token</h4>
+                   <h2 className="text-3xl font-display leading-tight">{activeBooking.zoneName}</h2>
+                   <div className="flex items-center justify-center gap-2 pt-2">
+                      <div className="px-3 py-1 bg-bg/10 rounded-full border border-bg/20">
+                         <span className="text-[10px] font-bold uppercase tracking-widest leading-none">Bay {activeBooking.bayLabel}</span>
+                      </div>
+                      <div className="px-3 py-1 bg-bg/10 rounded-full border border-bg/20">
+                         <span className="text-[10px] font-bold uppercase tracking-widest leading-none">Lvl 0{Math.floor(Math.random() * 3) + 1}</span>
+                      </div>
+                   </div>
                </div>
 
-               <div className="p-8 space-y-8">
-                  <div className="grid grid-cols-2 gap-4 text-left">
-                     <div>
-                        <p className="text-[9px] font-bold text-gray uppercase mb-1">Start Time</p>
-                        <p className="font-extrabold text-royal-blue">{new Date(activeBooking.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+               <div className="p-10 space-y-12">
+                  <div className="grid grid-cols-2 gap-8 text-left">
+                     <div className="p-4 bg-raised border border-border rounded-2xl">
+                        <p className="text-[8px] font-bold text-dim uppercase tracking-widest mb-1.5">Launch Time</p>
+                        <p className="text-xl font-display text-white">{new Date(activeBooking.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                      </div>
-                     <div>
-                        <p className="text-[9px] font-bold text-gray uppercase mb-1">Expiry Time</p>
-                        <p className="font-extrabold text-error">{new Date(activeBooking.expiryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                     <div className="p-4 bg-error/5 border border-error/20 rounded-2xl">
+                        <p className="text-[8px] font-bold text-error/60 uppercase tracking-widest mb-1.5">Deactivate</p>
+                        <p className="text-xl font-display text-error">{new Date(activeBooking.expiryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                      </div>
                   </div>
 
                   {activeBooking.status === 'pending' ? (
-                    <div className="space-y-4">
-                        <div className="w-32 h-32 border-8 border-warning/20 border-t-warning rounded-full mx-auto flex flex-col items-center justify-center">
-                           <span className="text-2xl font-extrabold text-warning">{formatTime(timeLeft)}</span>
-                           <span className="text-[8px] font-bold text-gray uppercase">To Check-in</span>
+                    <div className="space-y-8">
+                        <div className="w-40 h-40 relative mx-auto flex flex-col items-center justify-center">
+                           <svg className="w-full h-full transform -rotate-90">
+                              <circle cx="80" cy="80" r="72" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-raised" />
+                              <circle 
+                                 cx="80" cy="80" r="72" 
+                                 stroke="currentColor" strokeWidth="8" fill="transparent" 
+                                 strokeDasharray="452" 
+                                 strokeDashoffset={452 - (452 * (timeLeft / (15 * 60)))} 
+                                 strokeLinecap="round" 
+                                 className="text-teal-br transition-all duration-1000" 
+                              />
+                           </svg>
+                           <div className="absolute inset-0 flex flex-col items-center justify-center">
+                              <span className="text-3xl font-display text-white">{formatTime(timeLeft)}</span>
+                              <span className="text-[8px] font-black text-dim uppercase tracking-widest mt-1">Check-in Window</span>
+                           </div>
                         </div>
-                        <Button variant="primary" className="w-full !rounded-xl py-4" onClick={checkIn}>
-                           Check-In on Arrival
-                        </Button>
-                        <Button variant="ghost" className="w-full text-gray" onClick={cancelBooking}>
-                           Cancel Reservation
-                        </Button>
+                        <div className="space-y-3">
+                           <Button className="w-full shadow-[0_0_20px_rgba(0,201,141,0.2)]" onClick={checkIn}>
+                              Authorize Docking
+                           </Button>
+                           <Button variant="ghost" className="w-full text-dim hover:text-white" onClick={cancelBooking}>
+                              Abort Operation
+                           </Button>
+                        </div>
                     </div>
                   ) : (
-                    <div className="space-y-6">
-                       <div className="w-40 h-40 bg-slate-50 border-2 border-slate-100 rounded-3xl mx-auto flex items-center justify-center p-4">
-                          {/* Mock QR */}
-                          <div className="grid grid-cols-5 gap-1">
-                             {[...Array(25)].map((_, i) => (
-                               <div key={i} className={`w-6 h-6 rounded-xs ${Math.random() > 0.4 ? 'bg-dark' : 'bg-transparent'}`}></div>
+                    <div className="space-y-10">
+                       <div className="w-48 h-48 bg-raised border border-border rounded-[32px] mx-auto flex items-center justify-center p-6 group transition-all hover:border-teal-br/30">
+                          <div className="grid grid-cols-6 gap-2">
+                             {[...Array(36)].map((_, i) => (
+                               <div key={i} className={`w-4 h-4 rounded-[2px] ${Math.random() > 0.4 ? 'bg-teal-br shadow-[0_0_5px_rgba(0,201,141,0.4)]' : 'bg-transparent border border-border/20'}`}></div>
                              ))}
                           </div>
                        </div>
-                       <div className="space-y-2">
-                        <p className="text-xs font-bold text-success uppercase flex items-center justify-center gap-1">
-                           <Zap className="w-4 h-4 fill-current" /> Valid Parking Session
-                        </p>
-                        <Button variant="outline" className="w-full !rounded-xl py-4 border-error text-error hover:bg-error hover:text-white" onClick={checkOut}>
-                            Release Bay (Check-Out)
+                       <div className="space-y-4">
+                        <div className="flex items-center justify-center gap-2">
+                           <div className="w-2 h-2 rounded-full pulse-dot"></div>
+                           <p className="text-[10px] font-black text-teal-br uppercase tracking-[4px]">Verified Active</p>
+                        </div>
+                        <Button className="w-full bg-error/10 border border-error/20 text-error hover:bg-error hover:text-white shadow-none" onClick={checkOut}>
+                            Terminate Session (Release)
                         </Button>
                        </div>
                     </div>
                   )}
                </div>
 
-               {/* Decoration perforation */}
-               <div className="absolute left-0 top-[200px] -translate-x-4 w-8 h-8 bg-slate-50 rounded-full border border-slate-100 shadow-inner"></div>
-               <div className="absolute right-0 top-[200px] translate-x-4 w-8 h-8 bg-slate-50 rounded-full border border-slate-100 shadow-inner"></div>
+               {/* Design Decoration */}
+               <div className="absolute left-0 top-[220px] -translate-x-4 w-8 h-8 bg-bg rounded-full border border-border"></div>
+               <div className="absolute right-0 top-[220px] translate-x-4 w-8 h-8 bg-bg rounded-full border border-border"></div>
             </div>
           </>
         )}
@@ -892,262 +980,283 @@ export default function App() {
   );
 
   const renderOverstayPrompt = () => (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-royal-blue text-white text-center">
-       <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mb-6">
-          <Clock className="w-10 h-10 text-white animate-pulse" />
+    <div className="min-h-screen flex flex-col items-center justify-center p-10 bg-bg text-center space-y-12">
+       <div className="w-24 h-24 bg-error/10 border border-error/30 rounded-[32px] flex items-center justify-center relative shadow-[0_0_40px_rgba(231,76,60,0.1)]">
+          <Clock className="w-12 h-12 text-error animate-pulse" />
        </div>
-       <h2 className="text-2xl font-bold mb-2">Session Ended</h2>
-       <p className="opacity-80 mb-8">You have reached the 8-hour maximum limit. Are you still parked at the campus?</p>
+       <div className="space-y-4">
+          <h2 className="text-3xl font-display text-white italic">SESSION_EXPIRED</h2>
+          <p className="text-muted text-sm font-sans max-w-[280px] leading-relaxed italic">
+             Continuous 8.0 hour peak reached. Neural handshake disconnected for safety. Confirm status immediately.
+          </p>
+       </div>
        
        <div className="w-full space-y-4">
-          <Button variant="primary" className="w-full bg-white text-royal-blue py-4" onClick={() => navigateTo('home')}>
-             Extend Session
+          <Button className="w-full shadow-[0_0_20px_rgba(0,201,141,0.2)]" onClick={() => navigateTo('home')}>
+             Reinstate Link (Extend)
           </Button>
-          <Button variant="outline" className="w-full border-white text-white py-4" onClick={checkOut}>
-             Check Out Now
+          <Button variant="ghost" className="w-full border border-border text-dim hover:text-white" onClick={checkOut}>
+             Decommission Node
           </Button>
        </div>
     </div>
   );
 
   const renderAISuggestions = () => (
-    <div className="pb-24">
-      <Header title="Smart Help" showBack onBack={goBack} />
+    <div className="pb-24 bg-bg">
+      <Header title="Neural Suggest" showBack onBack={goBack} />
       
-      <main className="px-6 py-4 space-y-8">
-        <div className="text-center space-y-3">
-          <div className="w-20 h-20 bg-baby-blue/20 rounded-full mx-auto flex items-center justify-center">
-            <Zap className="w-10 h-10 text-royal-blue" />
+      <main className="px-6 py-8 space-y-10">
+        <div className="text-center space-y-4">
+          <div className="w-24 h-24 bg-teal-br/10 border border-teal-br/30 rounded-[32px] mx-auto flex items-center justify-center relative shadow-[0_0_40px_rgba(0,201,141,0.1)]">
+            <Zap className="w-12 h-12 text-teal-br" />
+            <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-teal-br pulse-dot"></div>
           </div>
-          <h2 className="text-2xl font-bold font-display text-royal-blue">Zone is Full!</h2>
-          <p className="text-slate-500">I've analyzed campus data to find the best alternative for you.</p>
+          <div className="space-y-1">
+             <h2 className="text-2xl font-display text-white">Zone Capacity Full</h2>
+             <p className="text-muted text-[10px] uppercase font-black tracking-widest italic opacity-50">Analyzing Campus Grid Flow...</p>
+          </div>
         </div>
 
         <div className="space-y-6">
-          <h3 className="font-bold flex items-center gap-2">
-            Top Alternatives
-          </h3>
+          <h3 className="text-[10px] font-display text-white uppercase tracking-[3px]">Logical Diverts</h3>
           
           <div className="space-y-4">
             {zones.filter(z => z.status === 'available').slice(0, 2).map((zone, idx) => (
-              <div key={zone.id} className="bg-white soft-shadow border border-slate-100 rounded-3xl p-6 relative overflow-hidden group">
+              <motion.div 
+                key={zone.id} 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                className="bg-card border border-border rounded-3xl p-6 relative overflow-hidden group hover:border-teal-dim transition-all"
+              >
                 <div className="relative z-10 flex justify-between items-center">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                       <span className="bg-royal-blue text-white w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold">
-                         {idx + 1}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                       <span className="w-6 h-6 border border-teal-br/30 text-teal-br flex items-center justify-center rounded-lg text-[10px] font-display bg-teal-br/5">
+                         0{idx + 1}
                        </span>
-                       <h4 className="font-bold text-lg">{zone.name}</h4>
+                       <h4 className="font-display text-white text-lg">{zone.name}</h4>
                     </div>
-                    <p className="text-sm text-slate-500">{zone.campus} • Typically less busy.</p>
-                    <div className="flex items-center gap-2 text-xs font-bold text-royal-blue pt-2">
-                       <Navigation className="w-3 h-3" />
-                       {zone.distance} away
+                    <p className="text-[10px] text-muted font-sans uppercase tracking-widest">{zone.campus} • High Stability Node</p>
+                    <div className="flex items-center gap-2 text-[10px] font-black text-teal-br pt-2 uppercase tracking-wide">
+                       <Navigation className="w-3.5 h-3.5" />
+                       {zone.distance} ETA
                     </div>
                   </div>
-                  <Button variant="outline" className="px-4 py-2" onClick={() => handleReserve(zone)}>
-                    Choose
+                  <Button onClick={() => handleReserve(zone)}>
+                    Select
                   </Button>
                 </div>
                 {idx === 0 && (
-                  <div className="absolute top-0 right-0 py-1 px-4 bg-royal-blue text-white text-[10px] font-bold uppercase tracking-widest rounded-bl-xl">
-                    Recommended
+                  <div className="absolute top-0 right-0 py-1 px-4 bg-teal-br/10 border-b border-l border-teal-br/30 text-teal-br text-[8px] font-black uppercase tracking-[3px] rounded-bl-xl italic">
+                    Optimal Divert
                   </div>
                 )}
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
 
-          <div className="ai-box-gradient p-5 rounded-xl text-white relative overflow-hidden">
-            <h4 className="font-bold text-sm mb-1">Smart Suggestion</h4>
-            <p className="text-[11px] opacity-90 leading-tight">
-              {selectedZone?.name} is full. Try <strong>Sports Centre</strong> (92% match). It usually has space until 10:30 AM.
+        <div className="p-6 bg-surface border-l-4 border-l-teal-br border border-border rounded-2xl space-y-3 relative overflow-hidden group">
+            <div className="flex items-center gap-2 mb-1">
+               <Zap className="w-3 h-3 text-teal-br fill-teal-br" />
+               <h4 className="text-[10px] font-black text-teal-br uppercase tracking-widest">Global AI Insight</h4>
+            </div>
+            <p className="text-xs text-white/90 leading-relaxed font-sans italic">
+              {selectedZone?.name} is saturated. Diverting to <strong>Sports Centre</strong>. Historical data indicates 94% availability window for next 45 minutes.
             </p>
-            <Button 
-                variant="ghost" 
-                className="w-full mt-3 bg-white/20 border-white/30 text-white hover:bg-white/30 !rounded-lg"
-                onClick={() => handleReserve(zones[0])}
-            >
-              Route to Suggestion
-            </Button>
-          </div>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-teal-br/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-teal-br/10 transition-all"></div>
+        </div>
       </main>
     </div>
   );
 
   const renderNotifications = () => (
-    <div className="min-h-screen pb-24">
-      <Header title="Notifications" showBack onBack={goBack} />
-      <div className="px-6 py-4 space-y-4">
+    <div className="min-h-screen pb-24 bg-bg">
+      <Header title="Neural Feed" showBack onBack={goBack} />
+      <div className="px-6 py-6 space-y-4">
         {MOCK_ALERTS.map((alert) => (
-          <div 
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
             key={alert.id} 
-            className={`p-4 rounded-2xl border bg-white flex gap-4 transition-all hover:soft-shadow ${alert.type === 'error' ? 'border-error/20' : alert.type === 'warning' ? 'border-warning/20' : 'border-success/20'}`}
+            className={`p-5 rounded-[24px] border bg-surface flex gap-5 transition-all hover:border-teal-dim/30 ${alert.type === 'error' ? 'border-error/20' : alert.type === 'warning' ? 'border-warning/20' : 'border-border'}`}
           >
-            <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${alert.type === 'error' ? 'bg-error' : alert.type === 'warning' ? 'bg-warning' : 'bg-success'}`}></div>
-            <div className="flex-1 space-y-1">
+            <div className={`w-2.5 h-2.5 rounded-full mt-2.5 shrink-0 ${alert.type === 'error' ? 'bg-error shadow-[0_0_10px_rgba(231,76,60,0.5)]' : alert.type === 'warning' ? 'bg-warning shadow-[0_0_10px_rgba(241,196,15,0.5)]' : 'bg-teal-br shadow-[0_0_10px_rgba(0,201,141,0.5)]'}`}></div>
+            <div className="flex-1 space-y-2">
               <div className="flex justify-between items-center">
-                <h4 className="font-bold text-royal-blue">{alert.title}</h4>
-                <span className="text-[10px] text-slate-400 font-bold uppercase">{alert.time}</span>
+                <h4 className="text-[13px] font-display text-white">{alert.title}</h4>
+                <span className="text-[8px] text-dim font-black uppercase tracking-widest">{alert.time}</span>
               </div>
-              <p className="text-sm text-slate-500 leading-snug">{alert.message}</p>
+              <p className="text-[10px] text-muted font-sans leading-relaxed italic">{alert.message}</p>
             </div>
-          </div>
+          </motion.div>
         ))}
-        
-        {MOCK_ALERTS.length === 0 && (
-          <div className="text-center py-20 text-slate-400">
-            No new notifications.
-          </div>
-        )}
       </div>
     </div>
   );
 
   const renderFeedback = () => (
-    <div className="min-h-screen pb-24">
-      <Header title="Zone Feedback" showBack onBack={goBack} />
-      <main className="px-6 py-4 space-y-8">
+    <div className="min-h-screen pb-24 bg-bg">
+      <Header title="Neural Feedback" showBack onBack={goBack} />
+      <main className="px-6 py-8 space-y-10">
         <div className="space-y-4">
-          <h2 className="text-2xl font-bold font-display text-royal-blue">Report Status</h2>
-          <p className="text-slate-500">Notice something different on the ground? Let us know to keep the data fresh for everyone.</p>
+          <h2 className="text-2xl font-display text-white italic tracking-tight">Grid Analysis Report</h2>
+          <p className="text-muted text-xs font-sans leading-relaxed">System relies on operator input for optimal data synchronization. Report anomalies discovered in physical space.</p>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-8">
           <div className="space-y-3">
-             <label className="text-xs font-bold uppercase text-slate-400">Select Zone</label>
-             <select className="w-full bg-white soft-shadow rounded-2xl px-4 py-4 outline-hidden appearance-none border-none">
-                <option>Select a zone...</option>
-                {zones.map(z => <option key={z.id}>{z.name}</option>)}
-             </select>
+             <label className="text-[9px] font-black uppercase text-dim tracking-[3px]">Target Node Access</label>
+             <div className="relative">
+                <select className="w-full bg-surface border border-border rounded-xl px-5 py-4 text-xs font-sans text-white outline-hidden appearance-none focus:border-teal-br/30 transition-all">
+                   <option>Select terminal...</option>
+                   {zones.map(z => <option key={z.id}>{z.name}</option>)}
+                </select>
+                <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-dim rotate-90 pointer-events-none" />
+             </div>
           </div>
 
           <div className="space-y-3">
-             <label className="text-xs font-bold uppercase text-slate-400">Current Observation</label>
-             <div className="grid grid-cols-2 gap-3">
-                <button className="p-4 rounded-2xl border bg-white text-center hover:bg-success/5 hover:border-success/30 transition-all flex flex-col items-center gap-2">
-                   <div className="w-3 h-3 bg-success rounded-full"></div>
-                   <span className="font-bold text-sm">Zone is Empty</span>
+             <label className="text-[9px] font-black uppercase text-dim tracking-[3px]">Visual Observation</label>
+             <div className="grid grid-cols-2 gap-4">
+                <button className="p-5 rounded-2xl bg-card border border-border text-center hover:border-teal-br/40 transition-all flex flex-col items-center gap-3 group">
+                   <div className="w-2.5 h-2.5 bg-teal-br rounded-full pulse-dot"></div>
+                   <span className="font-display text-white text-[12px] uppercase">Node Empty</span>
                 </button>
-                <button className="p-4 rounded-2xl border bg-white text-center hover:bg-error/5 hover:border-error/30 transition-all flex flex-col items-center gap-2">
-                   <div className="w-3 h-3 bg-error rounded-full"></div>
-                   <span className="font-bold text-sm">Zone is Full</span>
+                <button className="p-5 rounded-2xl bg-card border border-border text-center hover:border-error/40 transition-all flex flex-col items-center gap-3 group">
+                   <div className="w-2.5 h-2.5 bg-error rounded-full shadow-[0_0_10px_rgba(231,76,60,0.5)]"></div>
+                   <span className="font-display text-white text-[12px] uppercase">Node Saturated</span>
                 </button>
              </div>
           </div>
 
           <div className="space-y-3">
-             <label className="text-xs font-bold uppercase text-slate-400">Additional Comments</label>
+             <label className="text-[9px] font-black uppercase text-dim tracking-[3px]">Data Notes</label>
              <textarea 
-               placeholder="e.g. Maintenance in progress, few spots near the back..." 
-               className="w-full bg-white soft-shadow rounded-2xl px-4 py-4 min-h-[120px] outline-hidden"
+               placeholder="Initialize anomaly description..." 
+               className="w-full bg-surface border border-border rounded-2xl px-5 py-5 min-h-[140px] text-xs font-sans outline-hidden text-white placeholder:text-dim focus:border-teal-br/30 transition-all"
              ></textarea>
           </div>
 
-          <Button 
-            variant="secondary" 
-            className="w-full" 
-            onClick={() => {
-              alert("Thank you for your feedback!");
-              navigateTo('home');
-            }}
-          >
-            Submit Feedback
-          </Button>
+          <div className="pt-4">
+             <Button 
+               className="w-full shadow-[0_0_20px_rgba(0,201,141,0.2)]" 
+               onClick={() => {
+                 navigateTo('home');
+               }}
+             >
+               Broadcast Report
+             </Button>
+          </div>
         </div>
       </main>
     </div>
   );
 
   const renderProfile = () => (
-    <div className="pb-24">
-      <Header title="User Profile" showBack onBack={goBack} onNotify={() => navigateTo('notifications')} />
+    <div className="pb-24 bg-bg">
+      <Header title="Console Profile" onNotify={() => navigateTo('notifications')} />
       
-      <main className="px-6 py-4 space-y-8">
-         <section className="text-center space-y-4 py-4">
-            <div className="w-24 h-24 bg-royal-blue rounded-full mx-auto flex items-center justify-center text-white text-3xl font-bold border-4 border-white shadow-xl">
-               AH
+      <main className="px-6 py-6 space-y-10">
+         <section className="text-center space-y-5 pb-4">
+            <div className="w-28 h-28 bg-surface border-4 border-raised rounded-full mx-auto flex items-center justify-center relative shadow-2xl">
+               <span className="text-4xl font-display text-teal-br">AH</span>
+               <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-teal-br rounded-xl border-4 border-bg flex items-center justify-center">
+                  <User className="w-4 h-4 text-bg" />
+               </div>
             </div>
-            <div>
-               <h2 className="text-2xl font-extrabold text-royal-blue tracking-tight">Alex Henderson</h2>
-               <p className="text-gray text-xs font-bold uppercase tracking-wider">alex.henderson@dut4life.ac.za</p>
+            <div className="space-y-1">
+               <h2 className="text-2xl font-display text-white">Alex Henderson</h2>
+               <p className="text-muted text-[10px] font-black uppercase tracking-[3px] italic">Access Lv.4 • Science Research</p>
             </div>
          </section>
 
          {activeBooking && (
-           <section className="space-y-3">
-             <h3 className="font-bold text-[10px] uppercase tracking-[0.2em] text-gray">Active Reservation</h3>
+           <section className="space-y-4">
+             <h3 className="text-[10px] font-display text-white uppercase tracking-[3px]">Linked Reservation</h3>
              <motion.div 
                whileTap={{ scale: 0.98 }}
-               className="themed-card !border-success bg-baby-blue/30 cursor-pointer" 
+               className="bg-card border-2 border-teal-br/30 p-6 rounded-[32px] cursor-pointer relative overflow-hidden group" 
                onClick={() => navigateTo('active')}
              >
-                <div className="flex justify-between items-center mb-1">
-                   <h4 className="font-bold text-sm text-royal-blue">{activeBooking.zoneName}</h4>
-                   <Badge status="available" />
+                <div className="flex justify-between items-start mb-4 relative z-10">
+                   <div className="space-y-1">
+                      <h4 className="font-display text-white text-lg">{activeBooking.zoneName}</h4>
+                      <p className="text-[9px] text-teal-br font-black uppercase tracking-widest italic">Node: #BK-{activeBooking.id.toUpperCase()}</p>
+                   </div>
+                   <div className="w-2 h-2 rounded-full pulse-dot"></div>
                 </div>
-                <p className="text-[10px] font-bold text-gray uppercase">Conf No: #BK-{activeBooking.id.toUpperCase()}</p>
-                <div className="mt-3 pt-3 border-t border-white flex justify-between items-center">
-                   <span className="text-[10px] font-bold text-success uppercase">Expires in {formatTime(timeLeft)}</span>
-                   <ChevronRight className="w-4 h-4 text-gray" />
+                <div className="pt-5 border-t border-border flex justify-between items-center relative z-10">
+                   <span className="text-[9px] font-black text-white uppercase tracking-widest italic">Signal expires in <span className="text-teal-br">{formatTime(timeLeft)}</span></span>
+                   <ChevronRight className="w-4 h-4 text-dim group-hover:text-teal-br transition-colors" />
                 </div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-teal-br/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
              </motion.div>
            </section>
          )}
 
          <section className="space-y-4">
-            <h3 className="font-bold text-[10px] uppercase tracking-[0.2em] text-gray">Booking History</h3>
+            <h3 className="text-[10px] font-display text-white uppercase tracking-[3px]">Operational History</h3>
             <div className="space-y-3">
                {MOCK_HISTORY.map(history => (
-                  <div key={history.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-50 flex justify-between items-center group active:bg-slate-50 transition-colors">
-                     <div className="space-y-1">
-                        <h4 className="font-bold text-xs text-dark">{history.zoneName}</h4>
-                        <p className="text-[9px] text-gray uppercase font-bold tracking-tight">{history.date} • {history.time}</p>
+                  <div key={history.id} className="bg-surface border border-border p-5 rounded-2xl flex justify-between items-center group transition-all hover:border-teal-dim">
+                     <div className="space-y-1.5">
+                        <h4 className="text-[11px] font-display text-white">{history.zoneName}</h4>
+                        <div className="flex items-center gap-2">
+                           <div className="w-1 h-1 rounded-full bg-dim"></div>
+                           <p className="text-[8px] text-muted uppercase font-black tracking-widest">{history.date} • {history.time}</p>
+                        </div>
                      </div>
-                     <span className={`text-[9px] font-bold uppercase tracking-widest ${history.status === 'completed' ? 'text-success' : 'text-error'}`}>
-                        {history.status}
-                     </span>
+                     <div className="flex items-center gap-3">
+                        <span className={`text-[8px] font-black uppercase tracking-[2px] italic ${history.status === 'completed' ? 'text-teal-br' : 'text-error opacity-60'}`}>
+                           {history.status}
+                        </span>
+                        <div className={`w-1.5 h-1.5 rounded-full ${history.status === 'completed' ? 'bg-teal-br' : 'bg-error'}`}></div>
+                     </div>
                   </div>
                ))}
             </div>
          </section>
 
-         <Button variant="outline" className="w-full text-error border-error/20 hover:bg-error/5 !rounded-xl" onClick={() => navigateTo('login')}>
-            Log Out Account
-         </Button>
+         <button 
+           onClick={() => navigateTo('login')}
+           className="w-full flex items-center justify-center p-5 bg-error/5 border border-error/20 rounded-2xl group transition-all hover:bg-error hover:border-error"
+         >
+            <span className="text-[10px] font-black text-error uppercase tracking-[4px] group-hover:text-white transition-colors">Terminate Authorized Session</span>
+         </button>
       </main>
 
-      {/* Nav Bar */}
-      <nav className="fixed bottom-6 left-6 right-6 bg-white/80 backdrop-blur-xl border border-white soft-shadow rounded-3xl px-6 py-4 flex items-center justify-between z-40">
-        <button onClick={() => navigateTo('home')} className={`p-2 rounded-xl transition-colors ${screen === 'home' ? 'text-royal-blue bg-royal-blue/10' : 'text-slate-400 hover:text-royal-blue'}`}>
-          <LayoutDashboard className="w-6 h-6" />
-        </button>
-        <button onClick={() => navigateTo('zones')} className={`p-2 rounded-xl transition-colors ${screen === 'zones' ? 'text-royal-blue bg-royal-blue/10' : 'text-slate-400 hover:text-royal-blue'}`}>
-          <MapIcon className="w-6 h-6" />
-        </button>
-        <button onClick={() => navigateTo('zones')} className="p-4 bg-royal-blue rounded-2xl -mt-12 shadow-xl shadow-royal-blue/30 text-white">
-          <Navigation className="w-7 h-7" />
-        </button>
-        <button onClick={() => navigateTo('active')} className={`p-2 rounded-xl transition-colors ${screen === 'active' ? 'text-royal-blue bg-royal-blue/10' : 'text-slate-400 hover:text-royal-blue'}`}>
-          <CalendarCheck className="w-6 h-6" />
-        </button>
-        <button onClick={() => navigateTo('profile')} className={`p-2 rounded-xl transition-colors ${screen === 'profile' ? 'text-royal-blue bg-royal-blue/10' : 'text-slate-400 hover:text-royal-blue'}`}>
-          <User className="w-6 h-6" />
-        </button>
+      <nav className="fixed bottom-6 left-6 right-6 bg-surface border border-border rounded-[24px] px-6 py-3 flex items-center justify-between z-40 shadow-2xl">
+        {[
+          { s: 'home' as Screen, i: LayoutDashboard },
+          { s: 'zones' as Screen, i: MapIcon },
+          { s: 'active' as Screen, i: CalendarCheck },
+          { s: 'profile' as Screen, i: User }
+        ].map(tab => (
+          <button 
+             key={tab.s}
+             onClick={() => navigateTo(tab.s)} 
+             className={`p-3 rounded-xl transition-all ${screen === tab.s ? 'bg-teal-br text-bg shadow-lg shadow-teal-br/20 scale-110' : 'text-muted hover:text-white'}`}
+          >
+            <tab.i className={`w-5 h-5 ${screen === tab.s ? 'stroke-3' : 'stroke-2'}`} />
+          </button>
+        ))}
       </nav>
     </div>
   );
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-slate-50 relative shadow-2xl">
+    <div className="max-w-md mx-auto min-h-screen bg-bg relative shadow-2xl overflow-x-hidden">
       <AnimatePresence mode="wait">
         <motion.div
           key={screen}
-          initial={{ opacity: 0, x: 20 }}
+          initial={{ opacity: 0, x: 10 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          exit={{ opacity: 0, x: -10 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="min-h-screen"
         >
           {screen === 'login' && renderLogin()}
           {screen === 'home' && renderHome()}
