@@ -5,25 +5,25 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", sans-serif;
 
-  --color-bg: #0b2320;
-  --color-surface: #0e2e2a;
-  --color-card: #112e28;
-  --color-raised: #163830;
-  --color-border: #1f4a40;
-  --color-teal-br: #00c98d;
-  --color-teal-mid: #00a572;
-  --color-teal-dim: #006b4d;
-  --color-teal-pale: #d0f5ea;
-  --color-mint: #e6faf4;
-  --color-white: #f0faf7;
-  --color-muted: #6aada0;
-  --color-dim: #3a7068;
+  --color-bg: #000000;
+  --color-surface: #14213d;
+  --color-card: #1c2b4a;
+  --color-raised: #283a5a;
+  --color-border: #14213d;
+  --color-accent: #fca311;
+  --color-accent-mid: #d98c11;
+  --color-accent-dim: #7a4e0a;
+  --color-accent-pale: #fef4e6;
+  --color-grey: #e5e5e5;
+  --color-white: #ffffff;
+  --color-muted: #e5e5e5;
+  --color-dim: #8a96a8;
 
   /* Bay States Mapping */
-  --color-bay-available: var(--color-teal-br);
-  --color-bay-occupied: #e74c3c; /* Keeping standard red for occupied but using theme teal for available */
-  --color-bay-reserved: var(--color-teal-dim);
-  --color-bay-selected: var(--color-teal-br);
+  --color-bay-available: var(--color-accent);
+  --color-bay-occupied: #e74c3c; 
+  --color-bay-reserved: var(--color-accent-dim);
+  --color-bay-selected: var(--color-accent);
 }
 
 body {
@@ -37,7 +37,7 @@ body {
 }
 
 @utility soft-shadow {
-  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6);
 }
 
 @utility themed-card {
@@ -48,18 +48,18 @@ body {
 }
 
 @utility glass {
-  background: rgba(14, 46, 42, 0.8);
+  background: rgba(20, 33, 61, 0.8);
   backdrop-filter: blur(12px);
   border: 1px solid var(--color-border);
 }
 
 @utility ai-box-gradient {
-  background: linear-gradient(135deg, var(--color-teal-dim) 0%, var(--color-surface) 100%);
+  background: linear-gradient(135deg, var(--color-accent-dim) 0%, var(--color-surface) 100%);
 }
 
 @utility pulse-dot {
-  background-color: var(--color-teal-br);
-  box-shadow: 0 0 10px var(--color-teal-br);
+  background-color: var(--color-accent);
+  box-shadow: 0 0 10px var(--color-accent);
   animation: pulse 2s infinite;
 }
 
